@@ -1,6 +1,6 @@
-# cursor-web
+# Agentic AI Chat
 
-A Cursor-powered AI development environment with advanced agentic capabilities.
+A Cursor-like AI development environment with advanced agentic capabilities, on a Web interface.
 
 ## Quick Start
 
