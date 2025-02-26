@@ -1,11 +1,38 @@
 import json
 import logging
+import os
 from typing import List, Dict, Any, Callable, Optional, Union
 from .file_tools import save_file, read_file
 from .command_tools import run_command, install_python_package
 from .web_tools import search, extract_content
 
 logger = logging.getLogger(__name__)
+
+# Dictionary to store conversation root directories
+CONVERSATION_ROOT_DIRS = {}
+
+def set_conversation_root_dir(conversation_id: str, root_dir: str):
+    """
+    Set the root directory for a specific conversation.
+    
+    Args:
+        conversation_id: The conversation ID
+        root_dir: The root directory path
+    """
+    CONVERSATION_ROOT_DIRS[conversation_id] = root_dir
+    logger.info(f"Set root directory for conversation {conversation_id}: {root_dir}")
+
+def get_conversation_root_dir(conversation_id: str) -> Optional[str]:
+    """
+    Get the root directory for a specific conversation.
+    
+    Args:
+        conversation_id: The conversation ID
+        
+    Returns:
+        The root directory path or None if not found
+    """
+    return CONVERSATION_ROOT_DIRS.get(conversation_id)
 
 # Tool definitions that match the schema expected by Claude API
 TOOL_DEFINITIONS = [
@@ -122,22 +149,85 @@ TOOL_DEFINITIONS = [
     }
 ]
 
+# Custom wrapper for save_file to handle conversation root directory
+def save_file_with_root(file_path: str, content: str, conversation_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Save content to a file, using the conversation root directory if available.
+    
+    Args:
+        file_path: Path where the file should be saved
+        content: Content to write to the file
+        conversation_id: Optional conversation ID for context
+        
+    Returns:
+        Dictionary with result information
+    """
+    if conversation_id and conversation_id in CONVERSATION_ROOT_DIRS:
+        root_dir = CONVERSATION_ROOT_DIRS[conversation_id]
+        # If file_path is not absolute, prepend the root directory
+        if not os.path.isabs(file_path):
+            file_path = os.path.join(root_dir, file_path)
+            logger.info(f"Using conversation root directory for save_file: {file_path}")
+    
+    return save_file(file_path=file_path, content=content)
+
+# Custom wrapper for read_file to handle conversation root directory
+def read_file_with_root(file_path: str, conversation_id: Optional[str] = None) -> str:
+    """
+    Read content from a file, using the conversation root directory if available.
+    
+    Args:
+        file_path: Path to the file to read
+        conversation_id: Optional conversation ID for context
+        
+    Returns:
+        The file content as a string
+    """
+    if conversation_id and conversation_id in CONVERSATION_ROOT_DIRS:
+        root_dir = CONVERSATION_ROOT_DIRS[conversation_id]
+        # If file_path is not absolute, prepend the root directory
+        if not os.path.isabs(file_path):
+            file_path = os.path.join(root_dir, file_path)
+            logger.info(f"Using conversation root directory for read_file: {file_path}")
+    
+    return read_file(file_path=file_path)
+
+# Custom wrapper for run_command to handle conversation root directory
+def run_command_with_root(command: str, cwd: Optional[str] = None, conversation_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Run a terminal command, using the conversation root directory if available.
+    
+    Args:
+        command: Command to execute
+        cwd: Current working directory (optional)
+        conversation_id: Optional conversation ID for context
+        
+    Returns:
+        Dictionary with command output and status
+    """
+    if conversation_id and conversation_id in CONVERSATION_ROOT_DIRS and not cwd:
+        cwd = CONVERSATION_ROOT_DIRS[conversation_id]
+        logger.info(f"Using conversation root directory for run_command: {cwd}")
+    
+    return run_command(command=command, cwd=cwd)
+
 # Mapping from tool names to actual functions
 TOOL_FUNCTIONS = {
-    "save_file": save_file,
-    "read_file": read_file,
-    "run_terminal_command": run_command,
+    "save_file": save_file_with_root,
+    "read_file": read_file_with_root,
+    "run_terminal_command": run_command_with_root,
     "install_python_package": install_python_package,
     "web_search": search,
     "extract_web_content": extract_content
 }
 
-def process_tool_calls(tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def process_tool_calls(tool_calls: List[Dict[str, Any]], conversation_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Process tool calls from Claude and execute them.
     
     Args:
         tool_calls: List of tool call objects from Claude
+        conversation_id: Optional conversation ID for context
         
     Returns:
         List of tool result objects in the format expected by Claude
@@ -158,7 +248,12 @@ def process_tool_calls(tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]
             try:
                 # Call the appropriate function
                 function = TOOL_FUNCTIONS[tool_name]
-                result = function(**tool_input)
+                
+                # Add conversation_id parameter if the function accepts it
+                if tool_name in ["save_file", "read_file", "run_terminal_command"]:
+                    result = function(**tool_input, conversation_id=conversation_id)
+                else:
+                    result = function(**tool_input)
             except Exception as e:
                 logger.error(f"Error executing tool {tool_name}: {str(e)}")
                 result = {
