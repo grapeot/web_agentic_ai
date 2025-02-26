@@ -26,8 +26,9 @@ if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
 # Import the functions to test
-from app.api.app import auto_execute_tool_calls, process_tool_calls_and_continue
-from app.api.app import conversations, auto_execute_tasks, client
+from app.api.services.tool_execution import auto_execute_tool_calls, process_tool_calls_and_continue
+from app.api.services.conversation import conversations, auto_execute_tasks
+from app.api.routes.chat import client
 
 # Sample tool call for testing
 SAMPLE_TOOL_CALL = {
@@ -47,35 +48,49 @@ SAMPLE_TOOL_RESULT = {
 @pytest.fixture
 def mock_process_tool_calls():
     """Mock the process_tool_calls function"""
-    with patch('app.api.app.process_tool_calls') as mock_func:
-        mock_func.return_value = [
-            {
-                "tool_use_id": "tool_call_12345",
-                "content": json.dumps(SAMPLE_TOOL_RESULT)
-            }
-        ]
-        yield mock_func
+    import app.api.services.tool_execution as tool_execution_module
+    
+    # Save the original function
+    original_func = tool_execution_module.process_tool_calls
+    
+    # Create the mock
+    mock_func = MagicMock()
+    mock_func.return_value = [
+        {
+            "tool_use_id": SAMPLE_TOOL_CALL["id"],
+            "content": json.dumps(SAMPLE_TOOL_RESULT)
+        }
+    ]
+    
+    # Replace the function in the module
+    tool_execution_module.process_tool_calls = mock_func
+    
+    # Yield the mock for test use
+    yield mock_func
+    
+    # Restore the original function after the test
+    tool_execution_module.process_tool_calls = original_func
 
 @pytest.fixture
 def mock_anthropic_client():
-    """Mock the Anthropic client for API calls"""
-    class MockResponse:
-        def __init__(self, content):
-            self.content = content
-            self.thinking = None
-            
-        def model_dump(self):
-            result = {"content": self.content}
-            if self.thinking:
-                result["thinking"] = self.thinking
-            return result
-    
-    with patch('app.api.app.client') as mock_client:
-        mock_create = MagicMock()
-        mock_create.return_value = MockResponse([
-            {"type": "text", "text": "Test response after tool execution"}
-        ])
-        mock_client.messages.create = mock_create
+    """Mock the Anthropic client"""
+    with patch('app.api.routes.chat.client') as mock_client:
+        # Create a mock response class
+        class MockResponse:
+            def __init__(self, content):
+                self.content = content
+                self.thinking = None
+                
+            def model_dump(self):
+                result = {"content": self.content}
+                if self.thinking:
+                    result["thinking"] = self.thinking
+                return result
+        
+        # Configure the mock response
+        mock_response = MockResponse([{"type": "text", "text": "Test response"}])
+        mock_client.messages.create.return_value = mock_response
+        
         yield mock_client
 
 # Reset global state after each test
@@ -120,8 +135,14 @@ async def test_auto_execute_tool_calls_error():
     tool_calls = [SAMPLE_TOOL_CALL]
     conversation_id = f"test_{uuid.uuid4()}"
     
-    # Mock process_tool_calls to raise an exception
-    with patch('app.api.app.process_tool_calls', side_effect=Exception("Test error")):
+    # Mock process_tool_calls to raise an exception using module-level patching
+    import app.api.services.tool_execution as tool_execution_module
+    original_func = tool_execution_module.process_tool_calls
+    
+    try:
+        mock_func = MagicMock(side_effect=Exception("Test error"))
+        tool_execution_module.process_tool_calls = mock_func
+        
         # Call the function
         result = await auto_execute_tool_calls(tool_calls, conversation_id)
         
@@ -131,6 +152,9 @@ async def test_auto_execute_tool_calls_error():
         error_content = json.loads(result[0]["content"])
         assert error_content["status"] == "error"
         assert "Test error" in error_content["message"]
+    finally:
+        # Restore the original function
+        tool_execution_module.process_tool_calls = original_func
 
 # Tests for process_tool_calls_and_continue
 @pytest.mark.asyncio
@@ -154,7 +178,8 @@ async def test_process_tool_calls_and_continue(mock_process_tool_calls, mock_ant
         1000,  # max_tokens
         False,  # thinking_mode
         2000,   # thinking_budget_tokens
-        False   # auto_execute_tools
+        False,   # auto_execute_tools
+        mock_anthropic_client  # Pass the mock client
     )
     
     # Verify that the conversation was updated
@@ -183,7 +208,8 @@ async def test_process_tool_calls_and_continue_with_cancellation():
         1000,  # max_tokens
         False,  # thinking_mode
         2000,   # thinking_budget_tokens
-        False   # auto_execute_tools
+        False,  # auto_execute_tools
+        None    # client
     )
     
     # Verify that the conversation was not updated
@@ -201,7 +227,7 @@ async def test_process_tool_calls_and_continue_with_error(mock_process_tool_call
     conversations[conversation_id] = []
     
     # Mock Anthropic client to raise an exception
-    with patch('app.api.app.client') as mock_client:
+    with patch('app.api.routes.chat.client') as mock_client:
         mock_create = MagicMock(side_effect=Exception("API error"))
         mock_client.messages.create = mock_create
         
@@ -212,7 +238,8 @@ async def test_process_tool_calls_and_continue_with_error(mock_process_tool_call
             1000,  # max_tokens
             False,  # thinking_mode
             2000,   # thinking_budget_tokens
-            False   # auto_execute_tools
+            False,  # auto_execute_tools
+            mock_client  # Pass the client explicitly
         )
     
     # Verify error was added to conversation
@@ -231,17 +258,22 @@ async def test_recursive_tool_calls():
     conversations[conversation_id] = []
     tool_calls = [SAMPLE_TOOL_CALL]
     
-    # Mock process_tool_calls to simulate tool execution
-    with patch('app.api.app.process_tool_calls') as mock_process:
+    # Mock process_tool_calls to simulate tool execution using module-level patching
+    import app.api.services.tool_execution as tool_execution_module
+    original_func = tool_execution_module.process_tool_calls
+    
+    try:
+        mock_process = MagicMock()
         mock_process.return_value = [
             {
                 "tool_use_id": "tool_call_12345",
                 "content": json.dumps(SAMPLE_TOOL_RESULT)
             }
         ]
+        tool_execution_module.process_tool_calls = mock_process
         
         # Mock Anthropic client to return a response with another tool call
-        with patch('app.api.app.client') as mock_client:
+        with patch('app.api.routes.chat.client') as mock_client:
             # First create a mock response that has a new tool call
             mock_response = MagicMock()
             mock_response.content = [
@@ -254,7 +286,7 @@ async def test_recursive_tool_calls():
             mock_client.messages.create = MagicMock(return_value=mock_response)
             
             # Patch the recursive call to track it
-            with patch('app.api.app.process_tool_calls_and_continue', AsyncMock()) as mock_recursive:
+            with patch('app.api.services.tool_execution.process_tool_calls_and_continue', AsyncMock()) as mock_recursive:
                 # Call the function
                 await process_tool_calls_and_continue(
                     tool_calls,
@@ -262,7 +294,8 @@ async def test_recursive_tool_calls():
                     1000,  # max_tokens
                     False,  # thinking_mode
                     2000,   # thinking_budget_tokens
-                    True    # auto_execute_tools - enable recursion
+                    True,    # auto_execute_tools - enable recursion
+                    mock_client  # Pass the client explicitly
                 )
                 
                 # Verify that the recursive function was called with the new tool calls
@@ -270,6 +303,9 @@ async def test_recursive_tool_calls():
                 args, kwargs = mock_recursive.call_args
                 assert len(args[0]) == 1  # First arg should be the new tool calls
                 assert args[0][0]["id"] == "tool_call_67890"  # Should have the new tool call
+    finally:
+        # Restore the original function
+        tool_execution_module.process_tool_calls = original_func
 
 if __name__ == "__main__":
     pytest.main(["-v", __file__]) 
