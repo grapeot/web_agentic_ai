@@ -129,7 +129,7 @@ async def auto_execute_tool_calls(tool_calls: List[Dict[str, Any]]) -> List[Dict
                 "content": json.dumps({
                     "status": "error",
                     "message": f"Error executing tool calls: {str(e)}"
-                })
+                }, ensure_ascii=False)
             })
         return error_results
 
