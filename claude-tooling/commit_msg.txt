@@ -1,1 +1,1 @@
-[Cursor] 修改导入路径将app.tools更新为app.api.tools
+[Cursor] 添加app/tools临时兼容层，确保所有测试能正确使用app.api.tools
