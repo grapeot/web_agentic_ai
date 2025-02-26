@@ -8,12 +8,13 @@ import json
 import logging
 import time
 import datetime
+import mimetypes
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Union
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse, JSONResponse, FileResponse, HTMLResponse
 from pydantic import BaseModel
 import anthropic
 from dotenv import load_dotenv
@@ -82,7 +83,7 @@ class ToolOutput(BaseModel):
     
 class UserRequest(BaseModel):
     messages: List[Message]
-    max_tokens: int = 8192
+    max_tokens: int = 4096
     temperature: float = 0.7
     thinking_mode: bool = True
     thinking_budget_tokens: int = 2000
@@ -132,7 +133,7 @@ def create_conversation_root_dir(conversation_id: str) -> str:
 # 添加一个新的路由参数
 class UserRequest(BaseModel):
     messages: List[Message]
-    max_tokens: int = 8192
+    max_tokens: int = 4096
     temperature: float = 0.7
     thinking_mode: bool = True
     thinking_budget_tokens: int = 2000
@@ -181,15 +182,15 @@ async def chat(request: UserRequest, background_tasks: BackgroundTasks, conversa
     try:
         logger.info("Received chat request")
         
-        # First check if conversation_id is provided in URL parameters
+        # 首先检查URL参数中是否提供了conversation_id
         if not conversation_id:
-            # If not provided in URL, try to extract from system messages in request body
+            # 如果URL参数中没有提供，尝试从请求体的系统消息中提取
             for message in request.messages:
                 if message.role == "system" and any(content.get("conversation_id") for content in message.content if isinstance(content, dict)):
                     conversation_id = next((content.get("conversation_id") for content in message.content if isinstance(content, dict) and "conversation_id" in content), None)
                     break
         
-        # If still not found, create a new conversation_id
+        # 如果仍未找到，创建新的conversation_id
         if not conversation_id:
             conversation_id = f"conv_{int(time.time())}"
             logger.info(f"Created new conversation ID: {conversation_id}")
@@ -557,7 +558,7 @@ async def submit_tool_results(
                   "5. Always provide complete, self-contained code that can run without user interaction\n"\
                   "6. Assume your code runs in a script context, not an interactive notebook",
             messages=history,
-            max_tokens=8192,
+            max_tokens=4096,
             temperature=1.0,  # Must be 1.0 when thinking is enabled
             tools=TOOL_DEFINITIONS,
             thinking={
@@ -625,7 +626,7 @@ async def submit_tool_results(
                 process_tool_calls_and_continue, 
                 tool_calls, 
                 conversation_id, 
-                8192,  # max_tokens 
+                4096,  # max_tokens 
                 True,  # thinking_mode
                 2000,  # thinking_budget_tokens
                 auto_execute_tools
@@ -675,7 +676,7 @@ async def get_conversation_messages(conversation_id: str):
         history = conversations[conversation_id]
         
         # Check conversation status
-        # If the last message is from the assistant and has no tool calls, conversation is considered complete
+        # Find the last message, if it's assistant message and no tool calls, then consider conversation completed
         status = "in_progress"
         if history and len(history) > 0:
             last_message = history[-1]
@@ -755,6 +756,156 @@ async def cancel_auto_execution(conversation_id: str):
     except Exception as e:
         logger.error(f"Error cancelling automatic execution: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# 添加一个新的端点用于提供会话目录中的文件
+@app.get("/api/conversation/{conversation_id}/files/{file_path:path}")
+async def serve_conversation_file(conversation_id: str, file_path: str):
+    """
+    Serve a file from a conversation directory
+    
+    Args:
+        conversation_id: Conversation ID
+        file_path: Path to the file within the conversation directory
+    """
+    try:
+        logger.info(f"[FILE SERVING] Request to serve file: {file_path} for conversation: {conversation_id}")
+        
+        # Check if we have a root directory for this conversation
+        if conversation_id not in conversation_root_dirs:
+            logger.error(f"[FILE SERVING] Root directory not found for conversation: {conversation_id}")
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        root_dir = conversation_root_dirs[conversation_id]
+        logger.info(f"[FILE SERVING] Found root directory: {root_dir}")
+        
+        # Resolve the full file path
+        full_path = os.path.join(root_dir, file_path)
+        logger.info(f"[FILE SERVING] Resolved full file path: {full_path}")
+        
+        # Check if the file exists
+        if not os.path.isfile(full_path):
+            logger.error(f"[FILE SERVING] File not found: {full_path}")
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        # Get file size for logging
+        file_size = os.path.getsize(full_path)
+        logger.info(f"[FILE SERVING] File size: {file_size} bytes")
+        
+        # Determine content type based on file extension
+        file_extension = os.path.splitext(file_path)[1].lower()
+        content_type, _ = mimetypes.guess_type(file_path)
+        
+        # Use explicit content types for common file types to ensure proper handling
+        if file_extension == '.md':
+            content_type = 'text/markdown'
+        elif file_extension == '.png':
+            content_type = 'image/png'
+        elif file_extension in ['.jpg', '.jpeg']:
+            content_type = 'image/jpeg'
+        elif file_extension == '.html':
+            content_type = 'text/html'
+        
+        logger.info(f"[FILE SERVING] Determined content type: {content_type}")
+        
+        # Add additional headers for debugging
+        headers = {
+            "X-File-Path": file_path,
+            "X-File-Size": str(file_size),
+            "X-Content-Type": content_type or "unknown",
+            "X-Debug-Full-Path": full_path,
+        }
+        
+        # Ensure Cache-Control headers for proper browser caching
+        if content_type and content_type.startswith('image/'):
+            headers["Cache-Control"] = "public, max-age=3600"
+        
+        logger.info(f"[FILE SERVING] Serving file with headers: {headers}")
+        
+        # Return the file as a response
+        logger.info(f"[FILE SERVING] Successfully serving file: {file_path}")
+        return FileResponse(
+            path=full_path, 
+            filename=os.path.basename(file_path),
+            media_type=content_type,
+            headers=headers
+        )
+    except Exception as e:
+        logger.error(f"[FILE SERVING] Error serving file: {str(e)}")
+        import traceback
+        logger.error(f"[FILE SERVING] Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error serving file: {str(e)}")
+
+# 添加一个新的端点用于列出会话目录中的文件
+@app.get("/api/conversation/{conversation_id}/files")
+async def list_conversation_files(conversation_id: str):
+    """
+    List files in a conversation directory
+    
+    Args:
+        conversation_id: Conversation ID
+    """
+    try:
+        logger.info(f"[FILE LISTING] Request to list files for conversation: {conversation_id}")
+        
+        # Check if we have a root directory for this conversation
+        if conversation_id not in conversation_root_dirs:
+            logger.error(f"[FILE LISTING] Root directory not found for conversation: {conversation_id}")
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        root_dir = conversation_root_dirs[conversation_id]
+        logger.info(f"[FILE LISTING] Found root directory: {root_dir}")
+        
+        # Find all files in the directory and subdirectories
+        files = []
+        for dirpath, dirnames, filenames in os.walk(root_dir):
+            for filename in filenames:
+                # Skip temporary or hidden files
+                if filename.startswith('.') or filename.endswith('.tmp'):
+                    continue
+                
+                full_path = os.path.join(dirpath, filename)
+                rel_path = os.path.relpath(full_path, root_dir)
+                
+                # Determine the file type based on extension
+                file_extension = os.path.splitext(filename)[1].lower()
+                content_type, _ = mimetypes.guess_type(filename)
+                
+                # Get file size
+                file_size = os.path.getsize(full_path)
+                
+                # Determine file type category
+                file_type = "other"
+                if content_type:
+                    if content_type.startswith('image/'):
+                        file_type = "image"
+                    elif content_type.startswith('text/'):
+                        file_type = "text"
+                    elif content_type.startswith('application/'):
+                        file_type = "application"
+                
+                # Create file URL
+                file_url = f"/api/conversation/{conversation_id}/files/{rel_path}"
+                
+                logger.info(f"[FILE LISTING] Found file: {rel_path}, type: {file_type}, size: {file_size} bytes, content-type: {content_type}")
+                
+                files.append({
+                    "name": filename,
+                    "path": rel_path,
+                    "url": file_url,
+                    "size": file_size,
+                    "content_type": content_type,
+                    "type": file_type,
+                    "extension": file_extension,
+                })
+        
+        logger.info(f"[FILE LISTING] Found {len(files)} files in conversation {conversation_id}")
+        return {"files": files}
+        
+    except Exception as e:
+        logger.error(f"[FILE LISTING] Error listing files: {str(e)}")
+        import traceback
+        logger.error(f"[FILE LISTING] Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error listing files: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

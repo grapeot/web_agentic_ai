@@ -120,6 +120,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         }
+        
+        // Also handle debug info toggles for file results
+        const jsonToggle = e.target.closest('.toggle-json-details');
+        if (jsonToggle) {
+            const jsonDetails = jsonToggle.closest('.file-result').querySelector('.file-json-details');
+            if (jsonDetails) {
+                jsonDetails.classList.toggle('collapsed');
+            }
+        }
     });
 
     // Functions
@@ -385,7 +394,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const arrow = document.createElement('span');
         arrow.className = 'toggle-arrow';
-        arrow.innerHTML = '&#9654;';
+        arrow.innerHTML = '&#9654;'; // Right arrow (collapsed state)
         header.appendChild(arrow);
         
         const headerText = document.createElement('span');
@@ -395,7 +404,7 @@ document.addEventListener('DOMContentLoaded', function() {
         toolCallDiv.appendChild(header);
         
         const content = document.createElement('div');
-        content.className = 'tool-content collapsed';
+        content.className = 'tool-content collapsed'; // Start collapsed by default
         
         if (toolCall.input) {
             const inputLabel = document.createElement('div');
@@ -448,27 +457,148 @@ document.addEventListener('DOMContentLoaded', function() {
             resultDiv.dataset.resultId = toolUseId;
             
             let resultContent = '';
+            let parsedResult = null;
+            
             try {
-                const jsonResult = JSON.parse(result);
-                resultContent = `<pre>${JSON.stringify(jsonResult, null, 2)}</pre>`;
+                // Try to parse the result as JSON
+                parsedResult = JSON.parse(result);
+                
+                // Check if this is a file result with rendering information
+                if (parsedResult.status === "success" && parsedResult.file_path && parsedResult.file_url) {
+                    // This is a file result, handle it based on render_type
+                    const fileName = parsedResult.file_path.split('/').pop();
+                    
+                    // Create a file result header
+                    resultContent += `<div class="file-result-header">
+                        <strong>File saved:</strong> ${fileName}
+                        <a href="${parsedResult.file_url}" target="_blank" class="file-download-link">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>`;
+                    
+                    // Handle different file types based on render_type
+                    if (parsedResult.render_type === "image") {
+                        // Image file - display it inline
+                        resultContent += `<div class="file-preview image-preview">
+                            <img src="${parsedResult.file_url}" alt="${fileName}" class="preview-image" />
+                        </div>`;
+                    } else if (parsedResult.render_type === "markdown") {
+                        // Markdown file - add a preview button
+                        resultContent += `<div class="file-preview markdown-preview-btn">
+                            <button class="btn btn-sm btn-outline-primary view-markdown" data-url="${parsedResult.view_url}">
+                                <i class="fas fa-file-alt"></i> View Markdown
+                            </button>
+                        </div>`;
+                    } else if (parsedResult.render_type === "html") {
+                        // HTML file - add a preview button
+                        resultContent += `<div class="file-preview html-preview-btn">
+                            <button class="btn btn-sm btn-outline-primary view-html" data-url="${parsedResult.view_url}">
+                                <i class="fas fa-code"></i> View HTML
+                            </button>
+                        </div>`;
+                    }
+                    
+                    // Add the full JSON for debugging
+                    resultContent += `<div class="file-json-details collapsed">
+                        <button class="btn btn-sm btn-outline-secondary toggle-json">Show Details</button>
+                        <pre class="json-content" style="display:none;">${JSON.stringify(parsedResult, null, 2)}</pre>
+                    </div>`;
+                } 
+                // Check if this is a command result with generated files
+                else if (parsedResult.status === "success" && parsedResult.generated_files && parsedResult.generated_files.length > 0) {
+                    // First add the regular command output
+                    resultContent += `<pre>${JSON.stringify(parsedResult, null, 2)}</pre>`;
+                    
+                    // Then add a separate section for generated files
+                    resultContent += `<div class="generated-files-section">
+                        <h5>Generated Files:</h5>
+                    </div>`;
+                    
+                    // For each generated file, add rendering based on file type
+                    for (const file of parsedResult.generated_files) {
+                        const fileName = file.file_name || file.file_path.split('/').pop();
+                        
+                        resultContent += `<div class="file-result">
+                            <div class="file-result-header">
+                                <strong>File:</strong> ${fileName}
+                                <a href="${file.file_url}" target="_blank" class="file-download-link">
+                                    <i class="fas fa-download"></i> Download
+                                </a>
+                            </div>`;
+                        
+                        // Handle different file types based on render_type
+                        if (file.render_type === "image") {
+                            resultContent += `<div class="file-preview image-preview">
+                                <img src="${file.file_url}" alt="${fileName}" class="preview-image" />
+                            </div>`;
+                        } else if (file.render_type === "markdown") {
+                            resultContent += `<div class="file-preview markdown-preview-btn">
+                                <button class="btn btn-sm btn-outline-primary view-markdown" data-url="${file.view_url || file.file_url}">
+                                    <i class="fas fa-file-alt"></i> View Markdown
+                                </button>
+                            </div>`;
+                        } else if (file.render_type === "html") {
+                            resultContent += `<div class="file-preview html-preview-btn">
+                                <button class="btn btn-sm btn-outline-primary view-html" data-url="${file.view_url || file.file_url}">
+                                    <i class="fas fa-code"></i> View HTML
+                                </button>
+                            </div>`;
+                        }
+                        
+                        resultContent += `</div>`;  // Close file-result div
+                    }
+                }
+                else {
+                    // Regular JSON result - display formatted
+                    resultContent = `<pre>${JSON.stringify(parsedResult, null, 2)}</pre>`;
+                }
             } catch (e) {
+                // Not JSON, display as text
+                console.error("Error parsing tool result:", e);
                 resultContent = `<pre>${result}</pre>`;
             }
             
             resultDiv.innerHTML = resultContent;
             resultContainer.appendChild(resultDiv);
             
-            const toolCall = resultContainer.closest('.tool-call');
-            if (toolCall) {
-                const toolContent = toolCall.querySelector('.tool-content');
-                if (toolContent && toolContent.classList.contains('collapsed')) {
-                    toolContent.classList.remove('collapsed');
+            // Add event listeners for buttons if needed
+            if (parsedResult) {
+                // Handle file result buttons
+                if (parsedResult.render_type || (parsedResult.generated_files && parsedResult.generated_files.length > 0)) {
+                    const viewMarkdownBtns = resultDiv.querySelectorAll('.view-markdown');
+                    viewMarkdownBtns.forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const url = this.getAttribute('data-url');
+                            fetchAndDisplayMarkdown(url, resultDiv);
+                        });
+                    });
                     
-                    const arrow = toolCall.querySelector('.toggle-arrow');
-                    if (arrow) {
-                        arrow.innerHTML = '&#9660;';
-                    }
+                    const viewHtmlBtns = resultDiv.querySelectorAll('.view-html');
+                    viewHtmlBtns.forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const url = this.getAttribute('data-url');
+                            displayHtmlPreview(url, resultDiv);
+                        });
+                    });
+                    
+                    const toggleJsonBtns = resultDiv.querySelectorAll('.toggle-json');
+                    toggleJsonBtns.forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const jsonContent = this.nextElementSibling;
+                            const isHidden = jsonContent.style.display === 'none';
+                            jsonContent.style.display = isHidden ? 'block' : 'none';
+                            this.textContent = isHidden ? 'Hide Details' : 'Show Details';
+                        });
+                    });
                 }
+            }
+            
+            // Find the parent tool call div and make sure it remains collapsed
+            const toolCallDiv = resultContainer.closest('.tool-call');
+            const toolContent = toolCallDiv.querySelector('.tool-content');
+            if (toolContent) {
+                // Ensure the content stays collapsed
+                toolContent.classList.add('collapsed');
             }
             
             chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -480,16 +610,230 @@ document.addEventListener('DOMContentLoaded', function() {
             standAloneResult.dataset.resultId = toolUseId;
             
             let resultContent = '';
+            let parsedResult = null;
+            
             try {
-                const jsonResult = JSON.parse(result);
-                resultContent = `<pre>${JSON.stringify(jsonResult, null, 2)}</pre>`;
+                // Try to parse the result as JSON
+                parsedResult = JSON.parse(result);
+                
+                // Check if this is a file result with rendering information
+                if (parsedResult.status === "success" && parsedResult.file_path && parsedResult.file_url) {
+                    // This is a file result, handle it based on render_type
+                    const fileName = parsedResult.file_path.split('/').pop();
+                    
+                    // Create a file result header
+                    resultContent += `<div class="file-result-header">
+                        <strong>File saved:</strong> ${fileName}
+                        <a href="${parsedResult.file_url}" target="_blank" class="file-download-link">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>`;
+                    
+                    // Handle different file types based on render_type
+                    if (parsedResult.render_type === "image") {
+                        // Image file - display it inline
+                        resultContent += `<div class="file-preview image-preview">
+                            <img src="${parsedResult.file_url}" alt="${fileName}" class="preview-image" />
+                        </div>`;
+                    } else if (parsedResult.render_type === "markdown") {
+                        // Markdown file - add a preview button
+                        resultContent += `<div class="file-preview markdown-preview-btn">
+                            <button class="btn btn-sm btn-outline-primary view-markdown" data-url="${parsedResult.view_url}">
+                                <i class="fas fa-file-alt"></i> View Markdown
+                            </button>
+                        </div>`;
+                    } else if (parsedResult.render_type === "html") {
+                        // HTML file - add a preview button
+                        resultContent += `<div class="file-preview html-preview-btn">
+                            <button class="btn btn-sm btn-outline-primary view-html" data-url="${parsedResult.view_url}">
+                                <i class="fas fa-code"></i> View HTML
+                            </button>
+                        </div>`;
+                    }
+                    
+                    // Add the full JSON for debugging
+                    resultContent += `<div class="file-json-details collapsed">
+                        <button class="btn btn-sm btn-outline-secondary toggle-json">Show Details</button>
+                        <pre class="json-content" style="display:none;">${JSON.stringify(parsedResult, null, 2)}</pre>
+                    </div>`;
+                } 
+                // Check if this is a command result with generated files
+                else if (parsedResult.status === "success" && parsedResult.generated_files && parsedResult.generated_files.length > 0) {
+                    // First add the regular command output
+                    resultContent += `<pre>${JSON.stringify(parsedResult, null, 2)}</pre>`;
+                    
+                    // Then add a separate section for generated files
+                    resultContent += `<div class="generated-files-section">
+                        <h5>Generated Files:</h5>
+                    </div>`;
+                    
+                    // For each generated file, add rendering based on file type
+                    for (const file of parsedResult.generated_files) {
+                        const fileName = file.file_name || file.file_path.split('/').pop();
+                        
+                        resultContent += `<div class="file-result">
+                            <div class="file-result-header">
+                                <strong>File:</strong> ${fileName}
+                                <a href="${file.file_url}" target="_blank" class="file-download-link">
+                                    <i class="fas fa-download"></i> Download
+                                </a>
+                            </div>`;
+                        
+                        // Handle different file types based on render_type
+                        if (file.render_type === "image") {
+                            resultContent += `<div class="file-preview image-preview">
+                                <img src="${file.file_url}" alt="${fileName}" class="preview-image" />
+                            </div>`;
+                        } else if (file.render_type === "markdown") {
+                            resultContent += `<div class="file-preview markdown-preview-btn">
+                                <button class="btn btn-sm btn-outline-primary view-markdown" data-url="${file.view_url || file.file_url}">
+                                    <i class="fas fa-file-alt"></i> View Markdown
+                                </button>
+                            </div>`;
+                        } else if (file.render_type === "html") {
+                            resultContent += `<div class="file-preview html-preview-btn">
+                                <button class="btn btn-sm btn-outline-primary view-html" data-url="${file.view_url || file.file_url}">
+                                    <i class="fas fa-code"></i> View HTML
+                                </button>
+                            </div>`;
+                        }
+                        
+                        resultContent += `</div>`;  // Close file-result div
+                    }
+                }
+                else {
+                    // Regular JSON result - display formatted
+                    resultContent = `<pre>${JSON.stringify(parsedResult, null, 2)}</pre>`;
+                }
             } catch (e) {
+                // Not JSON, display as text
+                console.error("Error parsing tool result:", e);
                 resultContent = `<pre>${result}</pre>`;
             }
             
             standAloneResult.innerHTML = resultContent;
             chatMessages.appendChild(standAloneResult);
+            
+            // Add event listeners for buttons if needed
+            if (parsedResult) {
+                // Handle file result buttons
+                if (parsedResult.render_type || (parsedResult.generated_files && parsedResult.generated_files.length > 0)) {
+                    const viewMarkdownBtns = standAloneResult.querySelectorAll('.view-markdown');
+                    viewMarkdownBtns.forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const url = this.getAttribute('data-url');
+                            fetchAndDisplayMarkdown(url, standAloneResult);
+                        });
+                    });
+                    
+                    const viewHtmlBtns = standAloneResult.querySelectorAll('.view-html');
+                    viewHtmlBtns.forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const url = this.getAttribute('data-url');
+                            displayHtmlPreview(url, standAloneResult);
+                        });
+                    });
+                    
+                    const toggleJsonBtns = standAloneResult.querySelectorAll('.toggle-json');
+                    toggleJsonBtns.forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const jsonContent = this.nextElementSibling;
+                            const isHidden = jsonContent.style.display === 'none';
+                            jsonContent.style.display = isHidden ? 'block' : 'none';
+                            this.textContent = isHidden ? 'Hide Details' : 'Show Details';
+                        });
+                    });
+                }
+            }
+            
             chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    }
+
+    // Add functions to fetch and display file content
+    function fetchAndDisplayMarkdown(url, container) {
+        const previewContainer = document.createElement('div');
+        previewContainer.className = 'markdown-content-preview';
+        previewContainer.innerHTML = '<div class="preview-loading"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+        
+        // Find the preview button container and append after it
+        const btnContainer = container.querySelector('.markdown-preview-btn');
+        if (btnContainer) {
+            btnContainer.after(previewContainer);
+        } else {
+            container.appendChild(previewContainer);
+        }
+        
+        // Fetch the markdown content
+        fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(markdown => {
+                // Render markdown
+                previewContainer.innerHTML = `
+                    <div class="markdown-preview-header">
+                        <button class="btn btn-sm btn-outline-secondary close-preview">
+                            <i class="fas fa-times"></i> Close Preview
+                        </button>
+                    </div>
+                    <div class="markdown-preview-content">${marked.parse(markdown)}</div>
+                `;
+                
+                // Add close button functionality
+                const closeBtn = previewContainer.querySelector('.close-preview');
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', function() {
+                        previewContainer.remove();
+                    });
+                }
+                
+                // Apply syntax highlighting to code blocks
+                previewContainer.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightBlock(block);
+                });
+            })
+            .catch(error => {
+                previewContainer.innerHTML = `<div class="alert alert-danger">Error loading Markdown: ${error.message}</div>`;
+            });
+    }
+    
+    function displayHtmlPreview(url, container) {
+        const previewContainer = document.createElement('div');
+        previewContainer.className = 'html-content-preview';
+        
+        // Create iframe container with header
+        previewContainer.innerHTML = `
+            <div class="html-preview-header">
+                <button class="btn btn-sm btn-outline-secondary close-preview">
+                    <i class="fas fa-times"></i> Close Preview
+                </button>
+                <a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-external-link-alt"></i> Open in New Tab
+                </a>
+            </div>
+            <div class="iframe-container">
+                <iframe src="${url}" sandbox="allow-scripts" class="html-preview-iframe"></iframe>
+            </div>
+        `;
+        
+        // Find the preview button container and append after it
+        const btnContainer = container.querySelector('.html-preview-btn');
+        if (btnContainer) {
+            btnContainer.after(previewContainer);
+        } else {
+            container.appendChild(previewContainer);
+        }
+        
+        // Add close button functionality
+        const closeBtn = previewContainer.querySelector('.close-preview');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function() {
+                previewContainer.remove();
+            });
         }
     }
 
@@ -506,33 +850,26 @@ document.addEventListener('DOMContentLoaded', function() {
     function startPollingForUpdates() {
         if (pollingInterval) {
             clearInterval(pollingInterval);
-            console.log("Cleared existing polling interval");
         }
         
         if (!conversationId || !isAutoExecutingTools) {
-            console.log("Not starting polling: conversationId=", conversationId, "isAutoExecuting=", isAutoExecutingTools);
             autoExecutionIndicator.style.display = 'none';
             return;
         }
-        
-        console.log("Starting to poll for conversation", conversationId);
         
         autoExecutionIndicator.style.display = 'block';
         
         pollingInterval = setInterval(() => {
             if (!isAutoExecutingTools) {
-                console.log("Auto execution flag turned off, stopping polling");
                 clearInterval(pollingInterval);
                 autoExecutionIndicator.style.display = 'none';
                 return;
             }
             
-            console.log("Polling for updates...");
             fetch(`${API_URL}/api/conversation/${conversationId}/messages`)
                 .then(response => {
                     if (!response.ok) {
                         if (response.status === 404) {
-                            console.log("No new messages yet");
                             return null;
                         }
                         throw new Error(`HTTP error! status: ${response.status}`);
@@ -541,18 +878,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
                 .then(data => {
                     if (data && data.messages && data.messages.length > 0) {
-                        console.log("Received new messages, status:", data.status);
                         updateChatWithNewMessages(data.messages);
                         
                         // Even when conversation is marked as complete,
                         // we keep isAutoExecutingTools true to allow continued interaction
                         if (data.status === "completed") {
-                            console.log("Conversation marked as complete, stopping polling but keeping auto-execute enabled");
                             clearInterval(pollingInterval);
                             autoExecutionIndicator.style.display = 'none';
                         }
-                    } else if (data) {
-                        console.log("Received response but no new messages, status:", data.status);
                     }
                 })
                 .catch(error => {
@@ -637,14 +970,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // If new tool calls are detected, ensure polling continues
         if (hasNewToolCalls) {
-            console.log("Found new tool calls, ensuring polling continues");
             isAutoExecutingTools = true;
             autoExecutionIndicator.style.display = 'block';
         }
         
         // If tool results are detected, ensure polling continues for assistant responses
         if (hasToolResults) {
-            console.log("Found tool results, ensuring polling continues for assistant response");
             isAutoExecutingTools = true;
             autoExecutionIndicator.style.display = 'block';
         }
