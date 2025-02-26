@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let waitingForToolResult = false;
     let isAutoExecutingTools = false;
     let pollingInterval = null;
+    let lastToolCallId = null; // Store the last tool call ID for result association
     
     // API endpoint - dynamically get current host
     const API_URL = window.location.origin;
@@ -70,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // 添加取消自动执行的事件监听器
+    // Add cancel auto-execution event listener
     cancelAutoExecutionButton.addEventListener('click', function() {
         if (isAutoExecutingTools) {
             isAutoExecutingTools = false;
@@ -79,7 +80,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 pollingInterval = null;
             }
             autoExecutionIndicator.style.display = 'none';
-            addMessageToChat('system', '已取消自动工具执行');
+            
+            addMessageToChat('system', 'Auto tool execution cancelled');
+        }
+    });
+
+    // Add event delegation for chat messages area to handle collapsible tool calls
+    chatMessages.addEventListener('click', function(e) {
+        // Find the closest tool call header element
+        const toolHeader = e.target.closest('.tool-call-header');
+        if (toolHeader) {
+            const toolCall = toolHeader.closest('.tool-call');
+            if (toolCall) {
+                const toolContent = toolCall.querySelector('.tool-content');
+                if (toolContent) {
+                    // Toggle expand/collapse state
+                    toolContent.classList.toggle('collapsed');
+                    
+                    // Update arrow icon
+                    const arrow = toolHeader.querySelector('.toggle-arrow');
+                    if (arrow) {
+                        if (toolContent.classList.contains('collapsed')) {
+                            arrow.innerHTML = '&#9654;'; // Right arrow (expand)
+                        } else {
+                            arrow.innerHTML = '&#9660;'; // Down arrow (collapse)
+                        }
+                    }
+                }
+            }
         }
     });
 
@@ -160,18 +188,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Store the tool use ID
                 currentToolUseId = toolCall.id;
                 
-                // 如果启用了自动执行工具，不显示工具结果输入模态框，而是开始轮询
+                // If auto-execute tools is enabled, don't show the tool result input modal, start polling instead
                 if (autoExecuteToolsSwitch.checked) {
+                    console.log("Tool calls found in initial response with auto-execute enabled, starting polling");
                     isAutoExecutingTools = true;
                     waitingForToolResult = false;
-                    addMessageToChat('system', `开始自动执行 ${toolCall.name} 工具...`);
                     startPollingForUpdates();
                 } else {
-                    // 手动模式，显示工具结果输入对话框
+                    // Manual mode, show tool result input dialog
                     waitingForToolResult = true;
                     toolResultTextarea.value = '';
                     toolResultModal.show();
                 }
+            } else if (autoExecuteToolsSwitch.checked) {
+                // Even if no immediate tool calls, if auto-execute is on, we should start polling
+                // This helps with tools that might be triggered by the backend directly
+                console.log("No immediate tool calls, but auto-execute is enabled - starting polling anyway");
+                isAutoExecutingTools = true;
+                startPollingForUpdates();
             }
         })
         .catch(error => {
@@ -181,7 +215,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function submitToolResult(toolUseId, result) {
-        addToolResultToChat(result);
+        addToolResultToChat(result, toolUseId);
         
         const requestBody = {
             tool_use_id: toolUseId,
@@ -212,20 +246,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Store the tool use ID
                 currentToolUseId = toolCall.id;
                 
-                // 如果启用了自动执行工具，不显示工具结果输入模态框，而是开始轮询
+                // If auto-execute tools is enabled, don't show the tool result input modal, start polling instead
                 if (autoExecuteToolsSwitch.checked) {
+                    console.log("Tool calls found with auto-execute enabled, continuing polling");
                     isAutoExecutingTools = true;
                     waitingForToolResult = false;
-                    addMessageToChat('system', `开始自动执行 ${toolCall.name} 工具...`);
                     startPollingForUpdates();
                 } else {
-                    // 手动模式，显示工具结果输入对话框
+                    // Manual mode, show tool result input dialog
                     waitingForToolResult = true;
                     toolResultTextarea.value = '';
                     toolResultModal.show();
                 }
             } else {
                 waitingForToolResult = false;
+                // Even if no immediate tool calls, if auto-execute is on, ensure we continue polling
+                if (autoExecuteToolsSwitch.checked) {
+                    console.log("No immediate tool calls after tool result, but ensuring polling continues");
+                    isAutoExecutingTools = true;
+                    startPollingForUpdates();
+                }
             }
         })
         .catch(error => {
@@ -258,15 +298,40 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function processAssistantMessage(content) {
         let textContent = '';
+        let toolCalls = []; // 用于存储工具调用信息
         
+        // Create a set of already displayed tool IDs
+        const displayedToolIds = new Set();
+        document.querySelectorAll('.tool-call').forEach(el => {
+            if (el.dataset.toolId) {
+                displayedToolIds.add(el.dataset.toolId);
+            }
+        });
+        
+        // 第一次遍历：收集文本内容和工具调用
         for (const item of content) {
             if (item.type === 'text') {
                 textContent += item.text;
+            } else if (item.type === 'tool_use' && !displayedToolIds.has(item.id)) {
+                // 存储工具调用信息，但暂不显示
+                toolCalls.push({
+                    id: item.id,
+                    name: item.name,
+                    input: item.input
+                });
+                displayedToolIds.add(item.id); // Add to the displayed set
+                lastToolCallId = item.id;
             }
         }
         
+        // 先显示文本内容（解释）
         if (textContent) {
             addMessageToChat('assistant', textContent);
+        }
+        
+        // 然后显示工具调用
+        for (const toolCall of toolCalls) {
+            addToolCallToChat(toolCall);
         }
         
         // Save the assistant message to conversation history
@@ -314,79 +379,187 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function addToolCallToChat(toolCall) {
-        const toolDiv = document.createElement('div');
-        toolDiv.className = 'message tool-call';
+        const toolCallDiv = document.createElement('div');
+        toolCallDiv.className = 'message tool-call';
+        toolCallDiv.dataset.toolId = toolCall.id; // Add tool ID as data attribute
         
-        const toolHeader = document.createElement('h5');
-        toolHeader.textContent = `Tool Call: ${toolCall.name}`;
-        toolDiv.appendChild(toolHeader);
+        const header = document.createElement('div');
+        header.className = 'tool-call-header';
         
-        const toolInput = document.createElement('div');
-        toolInput.className = 'tool-input';
-        toolInput.innerHTML = `<pre><code>${JSON.stringify(toolCall.input, null, 2)}</code></pre>`;
-        toolDiv.appendChild(toolInput);
+        const arrow = document.createElement('span');
+        arrow.className = 'toggle-arrow';
+        arrow.innerHTML = '&#9654;'; // Right arrow (expand)
+        header.appendChild(arrow);
         
-        chatMessages.appendChild(toolDiv);
+        const headerText = document.createElement('span');
+        headerText.textContent = `Tool Call: ${toolCall.name}`;
+        header.appendChild(headerText);
+        
+        toolCallDiv.appendChild(header);
+        
+        const content = document.createElement('div');
+        content.className = 'tool-content collapsed';
+        
+        // Add tool input parameters
+        if (toolCall.input) {
+            const inputLabel = document.createElement('div');
+            inputLabel.className = 'tool-section-label';
+            inputLabel.textContent = 'Input Parameters:';
+            content.appendChild(inputLabel);
+            
+            const toolInput = document.createElement('div');
+            toolInput.className = 'tool-input';
+            
+            // Beautify JSON display
+            try {
+                let jsonInput;
+                if (typeof toolCall.input === 'string') {
+                    // Try to parse JSON string
+                    jsonInput = JSON.parse(toolCall.input);
+                } else {
+                    // Already an object
+                    jsonInput = toolCall.input;
+                }
+                
+                // Use formatted JSON for display
+                const formattedJson = JSON.stringify(jsonInput, null, 2);
+                toolInput.innerHTML = `<pre>${formattedJson}</pre>`;
+            } catch (e) {
+                // If not valid JSON or error occurs, display original input
+                toolInput.innerHTML = `<pre>${toolCall.input}</pre>`;
+            }
+            
+            content.appendChild(toolInput);
+        }
+        
+        // Create a container for tool results, to be filled later
+        const resultLabel = document.createElement('div');
+        resultLabel.className = 'tool-section-label';
+        resultLabel.textContent = 'Result:';
+        content.appendChild(resultLabel);
+        
+        const resultContainer = document.createElement('div');
+        resultContainer.className = 'tool-result-container';
+        resultContainer.dataset.forToolId = toolCall.id;
+        
+        // No loading indicator anymore, we'll just have an empty container until results arrive
+        
+        content.appendChild(resultContainer);
+        toolCallDiv.appendChild(content);
+        
+        chatMessages.appendChild(toolCallDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
-        
-        // Apply syntax highlighting to code blocks
-        document.querySelectorAll('pre code').forEach((block) => {
-            hljs.highlightBlock(block);
-        });
     }
     
-    function addToolResultToChat(result) {
-        const resultDiv = document.createElement('div');
-        resultDiv.className = 'message tool-result';
+    function addToolResultToChat(result, toolUseId) {
+        // Find the result container for the corresponding tool call
+        const resultContainer = document.querySelector(`.tool-result-container[data-for-tool-id="${toolUseId}"]`);
         
-        const resultHeader = document.createElement('h5');
-        resultHeader.textContent = 'Tool Result:';
-        resultDiv.appendChild(resultHeader);
-        
-        const resultContent = document.createElement('div');
-        // Replace newlines with <br> tags and escape HTML to prevent XSS
-        const escapedResult = result
+        if (resultContainer) {
+            // No need to clear loading state as we don't have it anymore
+            
+            // Create result content
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'tool-result';
+            resultDiv.dataset.resultId = toolUseId;
+            
+            let resultContent = '';
+            try {
+                // Try to parse and format JSON
+                const jsonResult = JSON.parse(result);
+                resultContent = `<pre>${JSON.stringify(jsonResult, null, 2)}</pre>`;
+            } catch (e) {
+                // If not valid JSON, display original text
+                resultContent = `<pre>${result}</pre>`;
+            }
+            
+            resultDiv.innerHTML = resultContent;
+            resultContainer.appendChild(resultDiv);
+            
+            // Auto-expand the tool content when result is received
+            const toolCall = resultContainer.closest('.tool-call');
+            if (toolCall) {
+                const toolContent = toolCall.querySelector('.tool-content');
+                if (toolContent && toolContent.classList.contains('collapsed')) {
+                    // Remove collapsed class
+                    toolContent.classList.remove('collapsed');
+                    
+                    // Update arrow icon
+                    const arrow = toolCall.querySelector('.toggle-arrow');
+                    if (arrow) {
+                        arrow.innerHTML = '&#9660;'; // Down arrow (collapse)
+                    }
+                }
+            }
+            
+            // Ensure chat window scrolls to the latest message
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        } else {
+            // If no corresponding tool call container found, create standalone result
+            console.warn(`Tool container with ID ${toolUseId} not found, creating standalone result`);
+            
+            const standAloneResult = document.createElement('div');
+            standAloneResult.className = 'message tool-result';
+            standAloneResult.dataset.resultId = toolUseId;
+            
+            let resultContent = '';
+            try {
+                // Try to parse and format JSON
+                const jsonResult = JSON.parse(result);
+                resultContent = `<pre>${JSON.stringify(jsonResult, null, 2)}</pre>`;
+            } catch (e) {
+                // If not valid JSON, display original text
+                resultContent = `<pre>${result}</pre>`;
+            }
+            
+            standAloneResult.innerHTML = resultContent;
+            chatMessages.appendChild(standAloneResult);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    }
+
+    // Helper function for HTML escaping
+    function escapeHtml(text) {
+        return text
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#039;')
             .replace(/\n/g, '<br>');
-            
-        resultContent.innerHTML = `<pre><code>${escapedResult}</code></pre>`;
-        resultDiv.appendChild(resultContent);
-        
-        chatMessages.appendChild(resultDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-        
-        // Apply syntax highlighting to code blocks
-        document.querySelectorAll('pre code').forEach((block) => {
-            hljs.highlightBlock(block);
-        });
     }
 
-    // 轮询函数：获取会话的新消息
+    // Polling function: Get new messages for conversation
     function startPollingForUpdates() {
         if (pollingInterval) {
             clearInterval(pollingInterval);
+            console.log("Cleared existing polling interval");
         }
         
         if (!conversationId || !isAutoExecutingTools) {
+            console.log("Not starting polling: conversationId=", conversationId, "isAutoExecuting=", isAutoExecutingTools);
             autoExecutionIndicator.style.display = 'none';
             return;
         }
         
-        // 显示自动执行进度指示器
+        console.log("Starting to poll for conversation", conversationId);
+        
+        // Show auto-execution indicator with cancel button
         autoExecutionIndicator.style.display = 'block';
         
-        // 每1.5秒检查一次新消息
+        // Remove the status message display - we won't show "Auto-executing tools..." anymore
+        // We'll only keep the indicator with cancel button
+        
+        // Check for new messages every 5 seconds
         pollingInterval = setInterval(() => {
             if (!isAutoExecutingTools) {
+                console.log("Auto execution flag turned off, stopping polling");
                 clearInterval(pollingInterval);
                 autoExecutionIndicator.style.display = 'none';
                 return;
             }
             
+            console.log("Polling for updates...");
             fetch(`${API_URL}/api/conversation/${conversationId}/messages`)
                 .then(response => {
                     if (!response.ok) {
@@ -400,48 +573,117 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
                 .then(data => {
                     if (data && data.messages && data.messages.length > 0) {
-                        // 处理新消息
+                        console.log("Received new messages, status:", data.status);
+                        // Process new messages
                         updateChatWithNewMessages(data.messages);
                         
-                        // 如果对话完成了，停止轮询
+                        // If conversation is completed, stop polling
                         if (data.status === "completed") {
+                            console.log("Conversation marked as complete, stopping polling");
                             isAutoExecutingTools = false;
                             clearInterval(pollingInterval);
                             autoExecutionIndicator.style.display = 'none';
                         }
+                    } else if (data) {
+                        console.log("Received response but no new messages, status:", data.status);
                     }
                 })
                 .catch(error => {
                     console.error("Error polling for updates:", error);
                 });
-        }, 1500);
+        }, 5000); // Check every 5 seconds
     }
     
-    // 处理新消息并更新UI
+    // Process new messages and update UI
     function updateChatWithNewMessages(newMessages) {
-        // 忽略已经处理过的消息
+        // Ignore already processed messages
         let lastMessageIndex = messages.length - 1;
         
-        // 遍历新消息
+        // Create a set of displayed tool call IDs
+        const displayedToolIds = new Set();
+        document.querySelectorAll('.tool-call').forEach(el => {
+            if (el.dataset.toolId) {
+                displayedToolIds.add(el.dataset.toolId);
+            }
+        });
+        
+        // Create a set of displayed tool result IDs
+        const displayedResultIds = new Set();
+        document.querySelectorAll('.tool-result').forEach(el => {
+            if (el.dataset.resultId) {
+                displayedResultIds.add(el.dataset.resultId);
+            }
+        });
+        
+        let hasNewToolCalls = false; // Track if we found new tool calls
+        
+        // Iterate through new messages
         for (let i = lastMessageIndex + 1; i < newMessages.length; i++) {
             const msg = newMessages[i];
             
             if (msg.role === "assistant") {
-                // 处理助手消息
+                // Process assistant messages
                 if (msg.content) {
-                    processAssistantMessage(msg.content);
-                }
-            } else if (msg.role === "user" && msg.content && msg.content.length > 0) {
-                // 查找工具结果消息
-                for (const item of msg.content) {
-                    if (item.type === "tool_result") {
-                        addToolResultToChat(item.content);
+                    let textContent = '';
+                    let hasNewToolCall = false;
+                    let newToolCalls = []; // 存储新的工具调用
+                    
+                    // 第一次遍历：收集文本内容和工具调用
+                    for (const item of msg.content) {
+                        if (item.type === 'text') {
+                            textContent += item.text;
+                        } else if (item.type === 'tool_use' && !displayedToolIds.has(item.id)) {
+                            // 收集工具调用但暂不显示
+                            displayedToolIds.add(item.id);
+                            lastToolCallId = item.id;
+                            newToolCalls.push({
+                                id: item.id,
+                                name: item.name,
+                                input: item.input
+                            });
+                            hasNewToolCall = true;
+                            hasNewToolCalls = true; // Update the outer flag
+                        }
+                    }
+                    
+                    // 先显示文本内容（解释）
+                    if (textContent) {
+                        addMessageToChat('assistant', textContent);
+                    }
+                    
+                    // 然后显示工具调用
+                    for (const toolCall of newToolCalls) {
+                        addToolCallToChat(toolCall);
+                    }
+                    
+                    // Only add message to history if it has new tool calls or text content
+                    if (textContent || hasNewToolCall) {
+                        messages.push(msg);
                     }
                 }
+            } else if (msg.role === "user" && msg.content && msg.content.length > 0) {
+                // Look for tool result messages
+                let hasToolResult = false;
+                for (const item of msg.content) {
+                    if (item.type === "tool_result" && !displayedResultIds.has(item.tool_use_id)) {
+                        displayedResultIds.add(item.tool_use_id);
+                        addToolResultToChat(item.content, item.tool_use_id);
+                        hasToolResult = true;
+                    }
+                }
+                
+                // Only add message to history if it has new tool results
+                if (hasToolResult) {
+                    messages.push(msg);
+                }
             }
-            
-            // 将消息添加到会话历史
-            messages.push(msg);
+        }
+        
+        // Make sure we keep auto-execution mode active if we found new tool calls
+        if (hasNewToolCalls) {
+            console.log("Found new tool calls, ensuring polling continues");
+            isAutoExecutingTools = true;
+            autoExecutionIndicator.style.display = 'block';
         }
     }
 }); 

@@ -2,6 +2,8 @@
 
 A Cursor-like AI development environment with advanced agentic capabilities, on a Web interface.
 
+WARNING: the project is mainly for demo purpose only, not for production use. It has severe security issues that essentially allows any user to access your system.
+
 ## Quick Start
 
 1. Activate the virtual environment:
@@ -22,10 +24,12 @@ A Cursor-like AI development environment with advanced agentic capabilities, on 
    # Basic single-worker mode (default)
    python claude-tooling/run.py
    
-   # Multi-worker mode for better concurrency
+   # Multi-worker mode for better concurrency. 
+   # WARNING: It still has some issues. Ideally we would need an external data source to share data between workers.
    python claude-tooling/run.py --workers 4
    
    # Production mode with Gunicorn (Linux/Mac only)
+   # WARNING: It still has some issues. Ideally we would need an external data source to share data between workers.
    python claude-tooling/run.py --use-gunicorn --workers 9
    ```
 
@@ -38,6 +42,7 @@ A Cursor-like AI development environment with advanced agentic capabilities, on 
 - **Web Tools** for searching and extracting web content
 - **Conversation Root Directories** - Each conversation is automatically assigned a unique directory in `runs/<timestamp>` for better organization of generated files
 - **Server Concurrency** - Support for multiple workers to handle concurrent requests for better performance
+- **Enhanced UI for Tool Calls** - Collapsible tool calls with clear visualization of inputs and results, automatic expansion when results arrive, and visual indicators for completed tool executions
 
 ## Testing
 
