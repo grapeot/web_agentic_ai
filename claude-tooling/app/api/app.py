@@ -761,101 +761,151 @@ async def cancel_auto_execution(conversation_id: str):
 @app.get("/api/conversation/{conversation_id}/files/{file_path:path}")
 async def serve_conversation_file(conversation_id: str, file_path: str):
     """
-    提供会话目录中的文件。
-    支持各种文件类型，如PNG、Markdown、HTML等。
+    Serve a file from a conversation directory
+    
+    Args:
+        conversation_id: Conversation ID
+        file_path: Path to the file within the conversation directory
     """
     try:
-        logger.info(f"Requested file {file_path} from conversation {conversation_id}")
+        logger.info(f"[FILE SERVING] Request to serve file: {file_path} for conversation: {conversation_id}")
         
+        # Check if we have a root directory for this conversation
         if conversation_id not in conversation_root_dirs:
-            logger.error(f"Conversation not found: {conversation_id}")
+            logger.error(f"[FILE SERVING] Root directory not found for conversation: {conversation_id}")
             raise HTTPException(status_code=404, detail="Conversation not found")
         
         root_dir = conversation_root_dirs[conversation_id]
-        full_path = os.path.join(root_dir, file_path)
+        logger.info(f"[FILE SERVING] Found root directory: {root_dir}")
         
-        if not os.path.exists(full_path):
-            logger.error(f"File not found: {full_path}")
+        # Resolve the full file path
+        full_path = os.path.join(root_dir, file_path)
+        logger.info(f"[FILE SERVING] Resolved full file path: {full_path}")
+        
+        # Check if the file exists
+        if not os.path.isfile(full_path):
+            logger.error(f"[FILE SERVING] File not found: {full_path}")
             raise HTTPException(status_code=404, detail="File not found")
         
-        # 根据文件扩展名确定内容类型
-        content_type, _ = mimetypes.guess_type(full_path)
+        # Get file size for logging
+        file_size = os.path.getsize(full_path)
+        logger.info(f"[FILE SERVING] File size: {file_size} bytes")
         
-        # 返回文件响应
-        logger.info(f"Serving file {full_path} with content type {content_type}")
-        return FileResponse(full_path, media_type=content_type)
+        # Determine content type based on file extension
+        file_extension = os.path.splitext(file_path)[1].lower()
+        content_type, _ = mimetypes.guess_type(file_path)
         
+        # Use explicit content types for common file types to ensure proper handling
+        if file_extension == '.md':
+            content_type = 'text/markdown'
+        elif file_extension == '.png':
+            content_type = 'image/png'
+        elif file_extension in ['.jpg', '.jpeg']:
+            content_type = 'image/jpeg'
+        elif file_extension == '.html':
+            content_type = 'text/html'
+        
+        logger.info(f"[FILE SERVING] Determined content type: {content_type}")
+        
+        # Add additional headers for debugging
+        headers = {
+            "X-File-Path": file_path,
+            "X-File-Size": str(file_size),
+            "X-Content-Type": content_type or "unknown",
+            "X-Debug-Full-Path": full_path,
+        }
+        
+        # Ensure Cache-Control headers for proper browser caching
+        if content_type and content_type.startswith('image/'):
+            headers["Cache-Control"] = "public, max-age=3600"
+        
+        logger.info(f"[FILE SERVING] Serving file with headers: {headers}")
+        
+        # Return the file as a response
+        logger.info(f"[FILE SERVING] Successfully serving file: {file_path}")
+        return FileResponse(
+            path=full_path, 
+            filename=os.path.basename(file_path),
+            media_type=content_type,
+            headers=headers
+        )
     except Exception as e:
-        logger.error(f"Error serving file: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"[FILE SERVING] Error serving file: {str(e)}")
+        import traceback
+        logger.error(f"[FILE SERVING] Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error serving file: {str(e)}")
 
 # 添加一个新的端点用于列出会话目录中的文件
 @app.get("/api/conversation/{conversation_id}/files")
 async def list_conversation_files(conversation_id: str):
     """
-    列出会话目录中的所有文件。
-    可用于前端显示文件列表。
+    List files in a conversation directory
+    
+    Args:
+        conversation_id: Conversation ID
     """
     try:
-        logger.info(f"Listing files for conversation {conversation_id}")
+        logger.info(f"[FILE LISTING] Request to list files for conversation: {conversation_id}")
         
+        # Check if we have a root directory for this conversation
         if conversation_id not in conversation_root_dirs:
-            logger.error(f"Conversation not found: {conversation_id}")
+            logger.error(f"[FILE LISTING] Root directory not found for conversation: {conversation_id}")
             raise HTTPException(status_code=404, detail="Conversation not found")
         
         root_dir = conversation_root_dirs[conversation_id]
+        logger.info(f"[FILE LISTING] Found root directory: {root_dir}")
         
-        if not os.path.exists(root_dir):
-            logger.error(f"Conversation directory not found: {root_dir}")
-            raise HTTPException(status_code=404, detail="Conversation directory not found")
-        
-        # 遍历目录并收集文件信息
+        # Find all files in the directory and subdirectories
         files = []
-        for root, dirs, filenames in os.walk(root_dir):
+        for dirpath, dirnames, filenames in os.walk(root_dir):
             for filename in filenames:
-                file_path = os.path.join(root, filename)
-                rel_path = os.path.relpath(file_path, root_dir)
+                # Skip temporary or hidden files
+                if filename.startswith('.') or filename.endswith('.tmp'):
+                    continue
                 
-                # 获取文件类型
-                content_type, _ = mimetypes.guess_type(file_path)
-                file_type = "unknown"
+                full_path = os.path.join(dirpath, filename)
+                rel_path = os.path.relpath(full_path, root_dir)
                 
+                # Determine the file type based on extension
+                file_extension = os.path.splitext(filename)[1].lower()
+                content_type, _ = mimetypes.guess_type(filename)
+                
+                # Get file size
+                file_size = os.path.getsize(full_path)
+                
+                # Determine file type category
+                file_type = "other"
                 if content_type:
                     if content_type.startswith('image/'):
                         file_type = "image"
-                    elif content_type == 'text/markdown' or filename.endswith('.md'):
-                        file_type = "markdown"
-                    elif content_type == 'text/html' or filename.endswith('.html'):
-                        file_type = "html"
                     elif content_type.startswith('text/'):
                         file_type = "text"
-                    else:
-                        file_type = content_type.split('/')[0]
+                    elif content_type.startswith('application/'):
+                        file_type = "application"
                 
-                # 计算文件大小
-                file_size = os.path.getsize(file_path)
-                
-                # 生成访问文件的URL
+                # Create file URL
                 file_url = f"/api/conversation/{conversation_id}/files/{rel_path}"
+                
+                logger.info(f"[FILE LISTING] Found file: {rel_path}, type: {file_type}, size: {file_size} bytes, content-type: {content_type}")
                 
                 files.append({
                     "name": filename,
                     "path": rel_path,
-                    "type": file_type,
-                    "content_type": content_type,
+                    "url": file_url,
                     "size": file_size,
-                    "url": file_url
+                    "content_type": content_type,
+                    "type": file_type,
+                    "extension": file_extension,
                 })
         
-        return {
-            "conversation_id": conversation_id,
-            "root_dir": root_dir,
-            "files": files
-        }
+        logger.info(f"[FILE LISTING] Found {len(files)} files in conversation {conversation_id}")
+        return {"files": files}
         
     except Exception as e:
-        logger.error(f"Error listing conversation files: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"[FILE LISTING] Error listing files: {str(e)}")
+        import traceback
+        logger.error(f"[FILE LISTING] Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error listing files: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
