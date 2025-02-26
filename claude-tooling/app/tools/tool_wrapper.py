@@ -89,7 +89,7 @@ TOOL_DEFINITIONS = [
                 },
                 "max_results": {
                     "type": "integer",
-                    "description": "Maximum number of results to return (optional, default: 10)"
+                    "description": "Maximum number of results to return (optional, default: 10, recommended: 10 for balance of comprehensiveness and relevance)"
                 },
                 "max_retries": {
                     "type": "integer",
@@ -173,7 +173,7 @@ def process_tool_calls(tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]
             }
         
         # Convert result to JSON string if it's not already a string
-        result_str = result if isinstance(result, str) else json.dumps(result)
+        result_str = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False)
         logger.info(f"Tool call result: {result}")
         
         # Format the result as expected by Claude
