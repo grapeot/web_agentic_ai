@@ -48,17 +48,22 @@ WARNING: the project is mainly for demo purpose only, not for production use. It
 
 ## Testing
 
-Run unit tests to verify functionality:
+The project includes a comprehensive test suite to ensure functionality and assist with code refactoring:
 
 ```bash
-# Run all tests
-python -m unittest discover claude-tooling/tests
+# Run all tests with the test runner script
+python claude-tooling/scripts/run_tests.py
 
-# Test specific components
-python claude-tooling/tests/test_tools.py
-python claude-tooling/tests/test_auto_execute.py "Test query message"
-python -m unittest claude-tooling/tests/test_web_tools.py
+# Run specific test groups
+python claude-tooling/scripts/run_tests.py --api
+python claude-tooling/scripts/run_tests.py --auto-execute
+python claude-tooling/scripts/run_tests.py --modularity
+
+# Run tests with verbose output and coverage reports
+python claude-tooling/scripts/run_tests.py --verbose --coverage
 ```
+
+See [tests/README.md](claude-tooling/tests/README.md) for detailed information about the testing strategy and how to use tests for refactoring.
 
 ## Dependencies
 
