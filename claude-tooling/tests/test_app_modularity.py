@@ -109,31 +109,31 @@ def test_chat_endpoint():
 
 def test_tool_results_endpoint():
     """Test that the tool results endpoint works correctly with the refactored structure"""
-    # 直接临时修改全局变量，而不是使用patch
+    # Directly modify global variables instead of using patch
     from app.api.services.conversation import conversations
     from app.api.routes.chat import client
     from unittest.mock import MagicMock
     
-    # 保存原始值
+    # Save original values
     orig_conversations = conversations.copy()
     orig_client = client
     
     try:
-        # 清空并设置测试数据
+        # Clear and set test data
         conversations.clear()
         conversation_id = "test_conv_1"
         conversations[conversation_id] = []
         
-        # 设置模拟客户端
+        # Set up mock client
         if client is None:
-            # 如果客户端为None，创建一个MagicMock
+            # If client is None, create a MagicMock
             client = MagicMock()
         
-        # 配置模拟响应
+        # Configure mock response
         mock_response = MockResponse([{"type": "text", "text": "This is a test response"}])
         client.messages.create = MagicMock(return_value=mock_response)
         
-        # 测试工具结果端点
+        # Test the tool results endpoint
         response = test_client.post(
             f"/api/tool-results?conversation_id={conversation_id}&auto_execute_tools=false",
             json={
@@ -148,7 +148,7 @@ def test_tool_results_endpoint():
         assert data["conversation_id"] == conversation_id
     
     finally:
-        # 恢复原始值
+        # Restore original values
         conversations.clear()
         conversations.update(orig_conversations)
         from app.api.routes.chat import set_anthropic_client
@@ -169,15 +169,15 @@ def test_get_tools_endpoint():
 
 def test_conversation_messages_endpoint():
     """Test that the conversation messages endpoint works correctly with the refactored structure"""
-    # 直接临时修改全局变量
+    # Directly modify global variables
     from app.api.services.conversation import conversations, conversation_root_dirs
     
-    # 保存原始值
+    # Save original values
     orig_conversations = conversations.copy()
     orig_dirs = conversation_root_dirs.copy()
     
     try:
-        # 清空并设置测试数据
+        # Clear and set test data
         conversations.clear()
         conversation_root_dirs.clear()
         
@@ -187,11 +187,11 @@ def test_conversation_messages_endpoint():
             {"role": "assistant", "content": [{"type": "text", "text": "Hi there!"}]}
         ]
         
-        # 设置测试数据
+        # Set up test data
         conversations[conversation_id] = mock_conversation
         conversation_root_dirs[conversation_id] = "/test/dir"
         
-        # 测试会话消息端点
+        # Test the conversation messages endpoint
         response = test_client.get(f"/api/conversation/{conversation_id}/messages")
         assert response.status_code == 200
         data = response.json()
@@ -200,7 +200,7 @@ def test_conversation_messages_endpoint():
         assert data["status"] == "completed"
     
     finally:
-        # 恢复原始值
+        # Restore original values
         conversations.clear()
         conversations.update(orig_conversations)
         conversation_root_dirs.clear()
@@ -210,16 +210,16 @@ def test_cancel_auto_execution_endpoint():
     """Test that the cancel auto execution endpoint works correctly with the refactored structure"""
     from unittest.mock import patch, MagicMock
     
-    # 直接模拟test_client.post方法
+    # Directly mock test_client.post method
     original_post = test_client.post
     
     try:
-        # 创建一个模拟响应
+        # Create a mock response
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"status": "success", "message": "Automatic tool execution cancelled"}
         
-        # 替换test_client.post方法
+        # Replace test_client.post method
         def mock_post(url, *args, **kwargs):
             if "/api/conversation/" in url and "/cancel" in url:
                 return mock_response
@@ -227,17 +227,17 @@ def test_cancel_auto_execution_endpoint():
         
         test_client.post = mock_post
         
-        # 测试取消端点
+        # Test the cancel endpoint
         conversation_id = "test_conv_1"
         response = test_client.post(f"/api/conversation/{conversation_id}/cancel")
         
-        # 验证响应
+        # Verify the response
         assert response.status_code == 200
         assert "status" in response.json()
         assert response.json()["status"] == "success"
     
     finally:
-        # 恢复原始方法
+        # Restore original method
         test_client.post = original_post
 
 # Module integration tests - testing that the modules can interact properly

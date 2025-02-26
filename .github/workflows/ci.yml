@@ -24,8 +24,8 @@ jobs:
           playwright install chromium
       - name: Run tests
         run: |
-          # 运行原有的unittest测试
+          # Run original unittest tests
           python -m unittest discover claude-tooling/tests
           
-          # 运行api和modularity测试，但跳过已知会导致崩溃的测试
+          # Run API and modularity tests, but skip tests known to cause crashes
           cd claude-tooling && python -m pytest tests/test_app_api.py tests/test_app_modularity.py tests/test_auto_execute.py -v 
