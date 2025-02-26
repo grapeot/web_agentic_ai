@@ -4,6 +4,8 @@ A Cursor-like AI development environment with advanced agentic capabilities, on 
 
 WARNING: the project is mainly for demo purpose only, not for production use. It has severe security issues that essentially allows any user to access your system.
 
+![Example screenshot](screenshot.png)
+
 ## Quick Start
 
 1. Activate the virtual environment:
