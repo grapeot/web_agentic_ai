@@ -448,15 +448,92 @@ document.addEventListener('DOMContentLoaded', function() {
             resultDiv.dataset.resultId = toolUseId;
             
             let resultContent = '';
+            let parsedResult = null;
+            
             try {
-                const jsonResult = JSON.parse(result);
-                resultContent = `<pre>${JSON.stringify(jsonResult, null, 2)}</pre>`;
+                // Try to parse the result as JSON
+                parsedResult = JSON.parse(result);
+                
+                // Check if this is a file result with rendering information
+                if (parsedResult.status === "success" && parsedResult.file_path && parsedResult.file_url) {
+                    // This is a file result, handle it based on render_type
+                    const fileName = parsedResult.file_path.split('/').pop();
+                    
+                    // Create a file result header
+                    resultContent += `<div class="file-result-header">
+                        <strong>File saved:</strong> ${fileName}
+                        <a href="${parsedResult.file_url}" target="_blank" class="file-download-link">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>`;
+                    
+                    // Handle different file types based on render_type
+                    if (parsedResult.render_type === "image") {
+                        // Image file - display it inline
+                        resultContent += `<div class="file-preview image-preview">
+                            <img src="${parsedResult.file_url}" alt="${fileName}" class="preview-image" />
+                        </div>`;
+                    } else if (parsedResult.render_type === "markdown") {
+                        // Markdown file - add a preview button
+                        resultContent += `<div class="file-preview markdown-preview-btn">
+                            <button class="btn btn-sm btn-outline-primary view-markdown" data-url="${parsedResult.view_url}">
+                                <i class="fas fa-file-alt"></i> View Markdown
+                            </button>
+                        </div>`;
+                    } else if (parsedResult.render_type === "html") {
+                        // HTML file - add a preview button
+                        resultContent += `<div class="file-preview html-preview-btn">
+                            <button class="btn btn-sm btn-outline-primary view-html" data-url="${parsedResult.view_url}">
+                                <i class="fas fa-code"></i> View HTML
+                            </button>
+                        </div>`;
+                    }
+                    
+                    // Add the full JSON for debugging
+                    resultContent += `<div class="file-json-details collapsed">
+                        <button class="btn btn-sm btn-outline-secondary toggle-json">Show Details</button>
+                        <pre class="json-content" style="display:none;">${JSON.stringify(parsedResult, null, 2)}</pre>
+                    </div>`;
+                } else {
+                    // Regular JSON result - display formatted
+                    resultContent = `<pre>${JSON.stringify(parsedResult, null, 2)}</pre>`;
+                }
             } catch (e) {
+                // Not JSON, display as text
                 resultContent = `<pre>${result}</pre>`;
             }
             
             resultDiv.innerHTML = resultContent;
             resultContainer.appendChild(resultDiv);
+            
+            // Add event listeners for buttons if needed
+            if (parsedResult && parsedResult.render_type) {
+                const viewMarkdownBtns = resultDiv.querySelectorAll('.view-markdown');
+                viewMarkdownBtns.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const url = this.getAttribute('data-url');
+                        fetchAndDisplayMarkdown(url, resultDiv);
+                    });
+                });
+                
+                const viewHtmlBtns = resultDiv.querySelectorAll('.view-html');
+                viewHtmlBtns.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const url = this.getAttribute('data-url');
+                        displayHtmlPreview(url, resultDiv);
+                    });
+                });
+                
+                const toggleJsonBtns = resultDiv.querySelectorAll('.toggle-json');
+                toggleJsonBtns.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const jsonContent = this.nextElementSibling;
+                        const isHidden = jsonContent.style.display === 'none';
+                        jsonContent.style.display = isHidden ? 'block' : 'none';
+                        this.textContent = isHidden ? 'Hide Details' : 'Show Details';
+                    });
+                });
+            }
             
             const toolCall = resultContainer.closest('.tool-call');
             if (toolCall) {
@@ -480,16 +557,181 @@ document.addEventListener('DOMContentLoaded', function() {
             standAloneResult.dataset.resultId = toolUseId;
             
             let resultContent = '';
+            let parsedResult = null;
+            
             try {
-                const jsonResult = JSON.parse(result);
-                resultContent = `<pre>${JSON.stringify(jsonResult, null, 2)}</pre>`;
+                // Try to parse the result as JSON
+                parsedResult = JSON.parse(result);
+                
+                // Check if this is a file result with rendering information
+                if (parsedResult.status === "success" && parsedResult.file_path && parsedResult.file_url) {
+                    // This is a file result, handle it based on render_type
+                    const fileName = parsedResult.file_path.split('/').pop();
+                    
+                    // Create a file result header
+                    resultContent += `<div class="file-result-header">
+                        <strong>File saved:</strong> ${fileName}
+                        <a href="${parsedResult.file_url}" target="_blank" class="file-download-link">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>`;
+                    
+                    // Handle different file types based on render_type
+                    if (parsedResult.render_type === "image") {
+                        // Image file - display it inline
+                        resultContent += `<div class="file-preview image-preview">
+                            <img src="${parsedResult.file_url}" alt="${fileName}" class="preview-image" />
+                        </div>`;
+                    } else if (parsedResult.render_type === "markdown") {
+                        // Markdown file - add a preview button
+                        resultContent += `<div class="file-preview markdown-preview-btn">
+                            <button class="btn btn-sm btn-outline-primary view-markdown" data-url="${parsedResult.view_url}">
+                                <i class="fas fa-file-alt"></i> View Markdown
+                            </button>
+                        </div>`;
+                    } else if (parsedResult.render_type === "html") {
+                        // HTML file - add a preview button
+                        resultContent += `<div class="file-preview html-preview-btn">
+                            <button class="btn btn-sm btn-outline-primary view-html" data-url="${parsedResult.view_url}">
+                                <i class="fas fa-code"></i> View HTML
+                            </button>
+                        </div>`;
+                    }
+                    
+                    // Add the full JSON for debugging
+                    resultContent += `<div class="file-json-details collapsed">
+                        <button class="btn btn-sm btn-outline-secondary toggle-json">Show Details</button>
+                        <pre class="json-content" style="display:none;">${JSON.stringify(parsedResult, null, 2)}</pre>
+                    </div>`;
+                } else {
+                    // Regular JSON result - display formatted
+                    resultContent = `<pre>${JSON.stringify(parsedResult, null, 2)}</pre>`;
+                }
             } catch (e) {
+                // Not JSON, display as text
                 resultContent = `<pre>${result}</pre>`;
             }
             
             standAloneResult.innerHTML = resultContent;
             chatMessages.appendChild(standAloneResult);
+            
+            // Add event listeners for buttons if needed
+            if (parsedResult && parsedResult.render_type) {
+                const viewMarkdownBtns = standAloneResult.querySelectorAll('.view-markdown');
+                viewMarkdownBtns.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const url = this.getAttribute('data-url');
+                        fetchAndDisplayMarkdown(url, standAloneResult);
+                    });
+                });
+                
+                const viewHtmlBtns = standAloneResult.querySelectorAll('.view-html');
+                viewHtmlBtns.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const url = this.getAttribute('data-url');
+                        displayHtmlPreview(url, standAloneResult);
+                    });
+                });
+                
+                const toggleJsonBtns = standAloneResult.querySelectorAll('.toggle-json');
+                toggleJsonBtns.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const jsonContent = this.nextElementSibling;
+                        const isHidden = jsonContent.style.display === 'none';
+                        jsonContent.style.display = isHidden ? 'block' : 'none';
+                        this.textContent = isHidden ? 'Hide Details' : 'Show Details';
+                    });
+                });
+            }
+            
             chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    }
+
+    // Add functions to fetch and display file content
+    function fetchAndDisplayMarkdown(url, container) {
+        const previewContainer = document.createElement('div');
+        previewContainer.className = 'markdown-content-preview';
+        previewContainer.innerHTML = '<div class="preview-loading"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+        
+        // Find the preview button container and append after it
+        const btnContainer = container.querySelector('.markdown-preview-btn');
+        if (btnContainer) {
+            btnContainer.after(previewContainer);
+        } else {
+            container.appendChild(previewContainer);
+        }
+        
+        // Fetch the markdown content
+        fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(markdown => {
+                // Render markdown
+                previewContainer.innerHTML = `
+                    <div class="markdown-preview-header">
+                        <button class="btn btn-sm btn-outline-secondary close-preview">
+                            <i class="fas fa-times"></i> Close Preview
+                        </button>
+                    </div>
+                    <div class="markdown-preview-content">${marked.parse(markdown)}</div>
+                `;
+                
+                // Add close button functionality
+                const closeBtn = previewContainer.querySelector('.close-preview');
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', function() {
+                        previewContainer.remove();
+                    });
+                }
+                
+                // Apply syntax highlighting to code blocks
+                previewContainer.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightBlock(block);
+                });
+            })
+            .catch(error => {
+                previewContainer.innerHTML = `<div class="alert alert-danger">Error loading Markdown: ${error.message}</div>`;
+            });
+    }
+    
+    function displayHtmlPreview(url, container) {
+        const previewContainer = document.createElement('div');
+        previewContainer.className = 'html-content-preview';
+        
+        // Create iframe container with header
+        previewContainer.innerHTML = `
+            <div class="html-preview-header">
+                <button class="btn btn-sm btn-outline-secondary close-preview">
+                    <i class="fas fa-times"></i> Close Preview
+                </button>
+                <a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-external-link-alt"></i> Open in New Tab
+                </a>
+            </div>
+            <div class="iframe-container">
+                <iframe src="${url}" sandbox="allow-scripts" class="html-preview-iframe"></iframe>
+            </div>
+        `;
+        
+        // Find the preview button container and append after it
+        const btnContainer = container.querySelector('.html-preview-btn');
+        if (btnContainer) {
+            btnContainer.after(previewContainer);
+        } else {
+            container.appendChild(previewContainer);
+        }
+        
+        // Add close button functionality
+        const closeBtn = previewContainer.querySelector('.close-preview');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function() {
+                previewContainer.remove();
+            });
         }
     }
 
