@@ -344,7 +344,16 @@ document.addEventListener('DOMContentLoaded', function() {
         resultDiv.appendChild(resultHeader);
         
         const resultContent = document.createElement('div');
-        resultContent.innerHTML = `<pre><code>${result}</code></pre>`;
+        // Replace newlines with <br> tags and escape HTML to prevent XSS
+        const escapedResult = result
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;')
+            .replace(/\n/g, '<br>');
+            
+        resultContent.innerHTML = `<pre><code>${escapedResult}</code></pre>`;
         resultDiv.appendChild(resultContent);
         
         chatMessages.appendChild(resultDiv);
