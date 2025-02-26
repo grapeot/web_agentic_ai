@@ -181,19 +181,19 @@ class TestWebSearch(unittest.TestCase):
         self.assertEqual(result["status"], "error")
         self.assertIn("error", result["message"].lower())
     
-    @patch('app.tools.web_tools.asyncio.run')
-    def test_search_wrapper(self, mock_asyncio_run):
+    @patch('app.tools.web_tools.web_search')
+    def test_search_wrapper(self, mock_web_search):
         """Test the synchronous wrapper for web_search."""
         # Setup mock
         mock_result = {"status": "success", "results": MOCK_SEARCH_RESULTS}
-        mock_asyncio_run.return_value = mock_result
+        mock_web_search.return_value = mock_result
         
         # Call function
         result = search("test query")
         
         # Assertions
         self.assertEqual(result, mock_result)
-        mock_asyncio_run.assert_called_once()
+        mock_web_search.assert_called_once_with("test query", 10, 3)
 
 
 # Tests for web content extraction functionality
@@ -289,20 +289,20 @@ class TestWebContentExtraction(unittest.TestCase):
         self.assertEqual(result["status"], "error")
         self.assertIn("error", result["message"].lower())
     
-    @patch('app.tools.web_tools.asyncio.run')
-    def test_extract_content_wrapper(self, mock_asyncio_run):
+    @patch('app.tools.web_tools.extract_web_content')
+    def test_extract_content_wrapper(self, mock_extract_web_content):
         """Test the synchronous wrapper for extract_web_content."""
         # Setup mock
         urls = ["https://example.com"]
         mock_result = {"status": "success", "results": [{"content": "test"}]}
-        mock_asyncio_run.return_value = mock_result
+        mock_extract_web_content.return_value = mock_result
         
         # Call function
         result = extract_content(urls)
         
         # Assertions
         self.assertEqual(result, mock_result)
-        mock_asyncio_run.assert_called_once()
+        mock_extract_web_content.assert_called_once_with(urls, 3)
 
 
 def run_tests():

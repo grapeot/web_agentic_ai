@@ -133,18 +133,12 @@ def test_web_search():
                     "body": "This is a test search result."
                 }
             ]
-            # Create a future for the async function
-            future = asyncio.Future()
-            future.set_result(mock_results)
-            mock_search.return_value = future
             
-            # Use asyncio to run the search function
-            loop = asyncio.get_event_loop()
-            if loop.is_closed():
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                
-            result = loop.run_until_complete(search(query))
+            # Configure the mock to return the results directly (not as a Future)
+            mock_search.return_value = mock_results
+            
+            # Run the search function
+            result = search(query)
             
             if result["status"] == "success" and "results" in result:
                 logger.info("web_search test passed!")
@@ -177,18 +171,12 @@ def test_extract_content():
                     "content": "This is extracted content from the test page."
                 }
             ]
-            # Create a future for the async function
-            future = asyncio.Future()
-            future.set_result(mock_results)
-            mock_process.return_value = future
             
-            # Use asyncio to run the extract function
-            loop = asyncio.get_event_loop()
-            if loop.is_closed():
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                
-            result = loop.run_until_complete(extract_content(urls))
+            # Configure the mock to return the results directly (not as a Future)
+            mock_process.return_value = mock_results
+            
+            # Run the extract function
+            result = extract_content(urls)
             
             if result["status"] == "success" and "results" in result:
                 logger.info("extract_content test passed!")

@@ -29,6 +29,7 @@ async def search_with_retry(query: str, max_results: int = 10, max_retries: int 
         try:
             logger.info(f"Searching for query: {query} (attempt {attempt + 1}/{max_retries})")
             
+            # Use DDGS synchronously but within an async context
             with DDGS() as ddgs:
                 results = list(ddgs.text(query, max_results=max_results))
                 
@@ -324,8 +325,34 @@ async def extract_web_content(urls: List[str], max_concurrent: int = 3) -> Dict[
 # Synchronous wrappers for the async functions
 def search(query: str, max_results: int = 10, max_retries: int = 3) -> Dict[str, Any]:
     """Synchronous wrapper for web_search"""
-    return asyncio.run(web_search(query, max_results, max_retries))
+    try:
+        # Create a new event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(web_search(query, max_results, max_retries))
+        loop.close()
+        return result
+    except Exception as e:
+        error_msg = f"Search failed: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "status": "error",
+            "message": error_msg
+        }
 
 def extract_content(urls: List[str], max_concurrent: int = 3) -> Dict[str, Any]:
     """Synchronous wrapper for extract_web_content"""
-    return asyncio.run(extract_web_content(urls, max_concurrent)) 
+    try:
+        # Create a new event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(extract_web_content(urls, max_concurrent))
+        loop.close()
+        return result
+    except Exception as e:
+        error_msg = f"Error extracting web content: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "status": "error",
+            "message": error_msg
+        } 
