@@ -7,6 +7,8 @@ import os
 import json
 import logging
 import time
+import datetime
+from pathlib import Path
 from typing import Dict, List, Any, Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,7 +22,8 @@ from dotenv import load_dotenv
 from ..tools.tool_wrapper import (
     TOOL_DEFINITIONS,
     process_tool_calls,
-    format_tool_results_for_claude
+    format_tool_results_for_claude,
+    set_conversation_root_dir
 )
 
 # Load environment variables
@@ -90,9 +93,38 @@ class UserResponse(BaseModel):
 
 # Store conversations
 conversations = {}
+# Store conversation root directories
+conversation_root_dirs = {}
 
 # 存储正在执行的自动工具调用任务状态
 auto_execute_tasks = {}
+
+# Function to create a conversation root directory
+def create_conversation_root_dir(conversation_id: str) -> str:
+    """
+    Create a directory for a conversation based on timestamp.
+    
+    Args:
+        conversation_id: The conversation ID
+        
+    Returns:
+        The path to the created directory
+    """
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    root_dir = os.path.join("runs", timestamp)
+    
+    # Create the directory if it doesn't exist
+    os.makedirs(root_dir, exist_ok=True)
+    
+    # Store the root directory for this conversation
+    conversation_root_dirs[conversation_id] = root_dir
+    
+    logger.info(f"Created root directory for conversation {conversation_id}: {root_dir}")
+    
+    # Update the tool wrapper with the conversation root directory
+    set_conversation_root_dir(conversation_id, root_dir)
+    
+    return root_dir
 
 # 添加一个新的路由参数
 class UserRequest(BaseModel):
@@ -104,16 +136,20 @@ class UserRequest(BaseModel):
     auto_execute_tools: bool = True  # New parameter to control automatic tool execution
 
 # 添加新的自动工具执行函数
-async def auto_execute_tool_calls(tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+async def auto_execute_tool_calls(tool_calls: List[Dict[str, Any]], conversation_id: str = None) -> List[Dict[str, Any]]:
     """
     Automatically execute tool calls and return results.
+    
+    Args:
+        tool_calls: List of tool calls to execute
+        conversation_id: Optional conversation ID for context
     """
     try:
         logger.info(f"Automatically executing {len(tool_calls)} tool calls")
         
         # Use the existing process_tool_calls function to handle tool calls
         # Since process_tool_calls may not be an async function, ensure proper handling
-        tool_results = process_tool_calls(tool_calls)
+        tool_results = process_tool_calls(tool_calls, conversation_id)
         
         # Return formatted tool results
         logger.info(f"Tool execution completed, {len(tool_results)} results obtained")
@@ -152,8 +188,15 @@ async def chat(request: UserRequest, background_tasks: BackgroundTasks):
         if not conversation_id:
             conversation_id = f"conv_{int(time.time())}"
             logger.info(f"Created new conversation ID: {conversation_id}")
+            
+            # Create a root directory for this conversation
+            create_conversation_root_dir(conversation_id)
         else:
             logger.info(f"Using existing conversation ID: {conversation_id}")
+            
+            # Create root directory if it doesn't exist for this conversation
+            if conversation_id not in conversation_root_dirs:
+                create_conversation_root_dir(conversation_id)
         
         # Prepare messages for Claude API
         api_messages = []
@@ -318,7 +361,7 @@ async def process_tool_calls_and_continue(
         
         # Automatically execute tool calls and get results
         try:
-            tool_results = await auto_execute_tool_calls(tool_calls)
+            tool_results = await auto_execute_tool_calls(tool_calls, conversation_id)
         except Exception as e:
             logger.error(f"Error executing tool calls: {str(e)}")
             # Add error message to history
@@ -635,14 +678,41 @@ async def get_conversation_messages(conversation_id: str):
                 if not has_tool_call:
                     status = "completed"
         
+        # Get the conversation root directory if available
+        root_dir = conversation_root_dirs.get(conversation_id, None)
+        
         return {
             "conversation_id": conversation_id,
             "messages": history,
-            "status": status
+            "status": status,
+            "root_dir": root_dir
         }
         
     except Exception as e:
         logger.error(f"Error getting conversation messages: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 添加一个新的端点获取会话根目录
+@app.get("/api/conversation/{conversation_id}/root")
+async def get_conversation_root(conversation_id: str):
+    """
+    Get the root directory for a specific conversation.
+    """
+    try:
+        logger.info(f"Getting root directory for conversation {conversation_id}")
+        
+        if conversation_id not in conversation_root_dirs:
+            raise HTTPException(status_code=404, detail="Conversation root directory not found")
+        
+        root_dir = conversation_root_dirs[conversation_id]
+        
+        return {
+            "conversation_id": conversation_id,
+            "root_dir": root_dir
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting conversation root directory: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # 添加一个新的端点用于取消自动工具执行

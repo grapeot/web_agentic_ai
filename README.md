@@ -24,6 +24,7 @@ A Cursor-like AI development environment with advanced agentic capabilities, on 
 - **File Management** tools for reading and writing files
 - **Command Execution** capabilities for terminal operations
 - **Web Tools** for searching and extracting web content
+- **Conversation Root Directories** - Each conversation is automatically assigned a unique directory in `runs/<timestamp>` for better organization of generated files
 
 ## Testing
 
