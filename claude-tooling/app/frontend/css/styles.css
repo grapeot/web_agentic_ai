@@ -139,6 +139,18 @@ body {
     margin-right: auto;
     color: #065f46;
     font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+    position: relative;
+}
+
+.tool-call:has(.tool-result)::before {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #0d9488;
+    right: 12px;
+    top: 12px;
 }
 
 .tool-call h5 {
@@ -251,21 +263,37 @@ body {
 }
 
 #auto-execution-indicator {
-    padding: 10px 16px;
+    padding: 8px 12px;
     border-radius: 8px;
     text-align: center;
-    margin: 10px 0;
-    font-size: 0.9rem;
+    margin: 4px 24px;
+    font-size: 0.85rem;
+    background-color: transparent;
 }
 
 .pulse {
-    background-color: #fff8e6;
-    border: 1px solid #fde68a;
-    color: #92400e;
-    padding: 10px 16px;
+    background-color: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #065f46;
+    padding: 8px 12px;
     border-radius: 8px;
     text-align: center;
     animation: pulse 2s infinite;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.pulse::before {
+    content: "•";
+    font-size: 1.5rem;
+    margin-right: 8px;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
 }
 
 @keyframes pulse {
@@ -364,4 +392,114 @@ pre code {
     font-style: italic;
     color: #64748b;
     max-width: 70%;
+}
+
+.auto-execution-message {
+    background-color: #f0fdfa;
+    border: 1px solid #a7f3d0;
+    color: #065f46;
+    font-size: 0.9rem;
+    max-width: 50%;
+    padding: 8px 12px;
+    font-style: normal;
+}
+
+/* 工具调用折叠/展开样式 */
+.tool-call-header {
+    cursor: pointer;
+    padding: 8px 0;
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+    color: #065f46;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s ease;
+}
+
+.tool-call-header:hover {
+    opacity: 0.9;
+    border-bottom: 1px solid rgba(6, 95, 70, 0.2);
+}
+
+/* Add a special style for headers of tool calls that have results */
+.tool-call:has(.tool-result) .tool-call-header {
+    color: #0d9488;
+    font-weight: 600;
+}
+
+.tool-call:has(.tool-result) .toggle-arrow {
+    color: #0d9488;
+}
+
+.toggle-arrow {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+    text-align: center;
+    margin-right: 8px;
+    font-size: 12px;
+    color: #065f46;
+    transition: transform 0.2s ease;
+}
+
+.tool-content {
+    padding-left: 28px;
+    max-height: 1000px;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.tool-content.collapsed {
+    max-height: 0;
+    overflow: hidden;
+}
+
+.tool-section-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #475569;
+    margin: 10px 0 4px 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.tool-input {
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background-color: rgba(255, 255, 255, 0.5);
+    border-radius: 6px;
+    border-left: 3px solid #065f46;
+}
+
+.tool-result-container {
+    margin-top: 12px;
+}
+
+.tool-result-loading {
+    font-style: italic;
+    color: #9ca3af;
+    padding: 6px 0;
+}
+
+.tool-result {
+    padding: 8px 12px;
+    background-color: rgba(255, 255, 255, 0.5);
+    border-radius: 6px;
+    margin-top: 8px;
+    border-left: 3px solid #0d9488;
+}
+
+.tool-result h5 {
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    color: #5b21b6;
+}
+
+.standalone-tool-result {
+    background-color: var(--tool-result-color);
+    border: 1px solid var(--tool-result-border);
+    margin-left: auto;
+    color: #5b21b6;
+    font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
 } 
