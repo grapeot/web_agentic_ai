@@ -326,11 +326,15 @@ async def extract_web_content(urls: List[str], max_concurrent: int = 3) -> Dict[
 def search(query: str, max_results: int = 10, max_retries: int = 3) -> Dict[str, Any]:
     """Synchronous wrapper for web_search"""
     try:
-        # Create a new event loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # For a function that's called in an async context (like FastAPI)
+        import nest_asyncio
+        
+        # Apply nest_asyncio to allow nested event loops
+        nest_asyncio.apply()
+        
+        # Now we can safely run the coroutine
+        loop = asyncio.get_event_loop()
         result = loop.run_until_complete(web_search(query, max_results, max_retries))
-        loop.close()
         return result
     except Exception as e:
         error_msg = f"Search failed: {str(e)}"
@@ -343,11 +347,15 @@ def search(query: str, max_results: int = 10, max_retries: int = 3) -> Dict[str,
 def extract_content(urls: List[str], max_concurrent: int = 3) -> Dict[str, Any]:
     """Synchronous wrapper for extract_web_content"""
     try:
-        # Create a new event loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # For a function that's called in an async context (like FastAPI)
+        import nest_asyncio
+        
+        # Apply nest_asyncio to allow nested event loops
+        nest_asyncio.apply()
+        
+        # Now we can safely run the coroutine
+        loop = asyncio.get_event_loop()
         result = loop.run_until_complete(extract_web_content(urls, max_concurrent))
-        loop.close()
         return result
     except Exception as e:
         error_msg = f"Error extracting web content: {str(e)}"

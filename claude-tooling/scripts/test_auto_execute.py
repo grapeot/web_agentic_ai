@@ -29,7 +29,7 @@ if parent_dir not in sys.path:
 load_dotenv()
 
 # Set API endpoint
-API_URL = "http://localhost:8000"  # Fixed port to default 8000
+API_URL = "http://localhost:8004"  # Updated to correct port
 
 # Global variables for interrupt handling
 current_conversation_id = None
@@ -127,7 +127,7 @@ def print_message(message, prefix=""):
 def send_message(message):
     """Send message to API and get response"""
     try:
-        # Prepare request body
+        # Prepare request body with properly structured messages
         request_body = {
             "messages": [
                 {
