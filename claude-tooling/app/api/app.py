@@ -9,21 +9,24 @@ import logging
 import time
 import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
+from typing import Dict, List, Any, Optional, Union
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel
 import anthropic
 from dotenv import load_dotenv
+import uuid
+import asyncio
 
 # Import local tool modules
 from ..tools.tool_wrapper import (
     TOOL_DEFINITIONS,
     process_tool_calls,
     format_tool_results_for_claude,
-    set_conversation_root_dir
+    set_conversation_root_dir,
+    get_conversation_root_dir
 )
 
 # Load environment variables
@@ -79,7 +82,7 @@ class ToolOutput(BaseModel):
     
 class UserRequest(BaseModel):
     messages: List[Message]
-    max_tokens: int = 4096
+    max_tokens: int = 8192
     temperature: float = 0.7
     thinking_mode: bool = True
     thinking_budget_tokens: int = 2000
@@ -129,7 +132,7 @@ def create_conversation_root_dir(conversation_id: str) -> str:
 # 添加一个新的路由参数
 class UserRequest(BaseModel):
     messages: List[Message]
-    max_tokens: int = 4096
+    max_tokens: int = 8192
     temperature: float = 0.7
     thinking_mode: bool = True
     thinking_budget_tokens: int = 2000
@@ -171,20 +174,22 @@ async def auto_execute_tool_calls(tool_calls: List[Dict[str, Any]], conversation
 
 # Modified chat route to support automatic tool execution
 @app.post("/api/chat", response_model=UserResponse)
-async def chat(request: UserRequest, background_tasks: BackgroundTasks):
+async def chat(request: UserRequest, background_tasks: BackgroundTasks, conversation_id: Optional[str] = None):
     """
     Process a chat request to Claude 3.7, handling tool calls.
     """
     try:
         logger.info("Received chat request")
         
-        # Extract conversation ID from the request if available
-        conversation_id = None
-        for message in request.messages:
-            if message.role == "system" and any(content.get("conversation_id") for content in message.content if isinstance(content, dict)):
-                conversation_id = next((content.get("conversation_id") for content in message.content if isinstance(content, dict) and "conversation_id" in content), None)
-                break
+        # First check if conversation_id is provided in URL parameters
+        if not conversation_id:
+            # If not provided in URL, try to extract from system messages in request body
+            for message in request.messages:
+                if message.role == "system" and any(content.get("conversation_id") for content in message.content if isinstance(content, dict)):
+                    conversation_id = next((content.get("conversation_id") for content in message.content if isinstance(content, dict) and "conversation_id" in content), None)
+                    break
         
+        # If still not found, create a new conversation_id
         if not conversation_id:
             conversation_id = f"conv_{int(time.time())}"
             logger.info(f"Created new conversation ID: {conversation_id}")
@@ -552,7 +557,7 @@ async def submit_tool_results(
                   "5. Always provide complete, self-contained code that can run without user interaction\n"\
                   "6. Assume your code runs in a script context, not an interactive notebook",
             messages=history,
-            max_tokens=4096,
+            max_tokens=8192,
             temperature=1.0,  # Must be 1.0 when thinking is enabled
             tools=TOOL_DEFINITIONS,
             thinking={
@@ -620,7 +625,7 @@ async def submit_tool_results(
                 process_tool_calls_and_continue, 
                 tool_calls, 
                 conversation_id, 
-                4096,  # max_tokens 
+                8192,  # max_tokens 
                 True,  # thinking_mode
                 2000,  # thinking_budget_tokens
                 auto_execute_tools
@@ -670,7 +675,7 @@ async def get_conversation_messages(conversation_id: str):
         history = conversations[conversation_id]
         
         # Check conversation status
-        # Find the last message, if it's assistant message and no tool calls, then consider conversation completed
+        # If the last message is from the assistant and has no tool calls, conversation is considered complete
         status = "in_progress"
         if history and len(history) > 0:
             last_message = history[-1]
