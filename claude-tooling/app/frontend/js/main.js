@@ -120,6 +120,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         }
+        
+        // Also handle debug info toggles for file results
+        const jsonToggle = e.target.closest('.toggle-json-details');
+        if (jsonToggle) {
+            const jsonDetails = jsonToggle.closest('.file-result').querySelector('.file-json-details');
+            if (jsonDetails) {
+                jsonDetails.classList.toggle('collapsed');
+            }
+        }
     });
 
     // Functions
@@ -385,7 +394,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const arrow = document.createElement('span');
         arrow.className = 'toggle-arrow';
-        arrow.innerHTML = '&#9654;';
+        arrow.innerHTML = '&#9654;'; // Right arrow (collapsed state)
         header.appendChild(arrow);
         
         const headerText = document.createElement('span');
@@ -395,7 +404,7 @@ document.addEventListener('DOMContentLoaded', function() {
         toolCallDiv.appendChild(header);
         
         const content = document.createElement('div');
-        content.className = 'tool-content collapsed';
+        content.className = 'tool-content collapsed'; // Start collapsed by default
         
         if (toolCall.input) {
             const inputLabel = document.createElement('div');
@@ -494,12 +503,58 @@ document.addEventListener('DOMContentLoaded', function() {
                         <button class="btn btn-sm btn-outline-secondary toggle-json">Show Details</button>
                         <pre class="json-content" style="display:none;">${JSON.stringify(parsedResult, null, 2)}</pre>
                     </div>`;
-                } else {
+                } 
+                // Check if this is a command result with generated files
+                else if (parsedResult.status === "success" && parsedResult.generated_files && parsedResult.generated_files.length > 0) {
+                    // First add the regular command output
+                    resultContent += `<pre>${JSON.stringify(parsedResult, null, 2)}</pre>`;
+                    
+                    // Then add a separate section for generated files
+                    resultContent += `<div class="generated-files-section">
+                        <h5>Generated Files:</h5>
+                    </div>`;
+                    
+                    // For each generated file, add rendering based on file type
+                    for (const file of parsedResult.generated_files) {
+                        const fileName = file.file_name || file.file_path.split('/').pop();
+                        
+                        resultContent += `<div class="file-result">
+                            <div class="file-result-header">
+                                <strong>File:</strong> ${fileName}
+                                <a href="${file.file_url}" target="_blank" class="file-download-link">
+                                    <i class="fas fa-download"></i> Download
+                                </a>
+                            </div>`;
+                        
+                        // Handle different file types based on render_type
+                        if (file.render_type === "image") {
+                            resultContent += `<div class="file-preview image-preview">
+                                <img src="${file.file_url}" alt="${fileName}" class="preview-image" />
+                            </div>`;
+                        } else if (file.render_type === "markdown") {
+                            resultContent += `<div class="file-preview markdown-preview-btn">
+                                <button class="btn btn-sm btn-outline-primary view-markdown" data-url="${file.view_url || file.file_url}">
+                                    <i class="fas fa-file-alt"></i> View Markdown
+                                </button>
+                            </div>`;
+                        } else if (file.render_type === "html") {
+                            resultContent += `<div class="file-preview html-preview-btn">
+                                <button class="btn btn-sm btn-outline-primary view-html" data-url="${file.view_url || file.file_url}">
+                                    <i class="fas fa-code"></i> View HTML
+                                </button>
+                            </div>`;
+                        }
+                        
+                        resultContent += `</div>`;  // Close file-result div
+                    }
+                }
+                else {
                     // Regular JSON result - display formatted
                     resultContent = `<pre>${JSON.stringify(parsedResult, null, 2)}</pre>`;
                 }
             } catch (e) {
                 // Not JSON, display as text
+                console.error("Error parsing tool result:", e);
                 resultContent = `<pre>${result}</pre>`;
             }
             
@@ -507,45 +562,43 @@ document.addEventListener('DOMContentLoaded', function() {
             resultContainer.appendChild(resultDiv);
             
             // Add event listeners for buttons if needed
-            if (parsedResult && parsedResult.render_type) {
-                const viewMarkdownBtns = resultDiv.querySelectorAll('.view-markdown');
-                viewMarkdownBtns.forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const url = this.getAttribute('data-url');
-                        fetchAndDisplayMarkdown(url, resultDiv);
+            if (parsedResult) {
+                // Handle file result buttons
+                if (parsedResult.render_type || (parsedResult.generated_files && parsedResult.generated_files.length > 0)) {
+                    const viewMarkdownBtns = resultDiv.querySelectorAll('.view-markdown');
+                    viewMarkdownBtns.forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const url = this.getAttribute('data-url');
+                            fetchAndDisplayMarkdown(url, resultDiv);
+                        });
                     });
-                });
-                
-                const viewHtmlBtns = resultDiv.querySelectorAll('.view-html');
-                viewHtmlBtns.forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const url = this.getAttribute('data-url');
-                        displayHtmlPreview(url, resultDiv);
+                    
+                    const viewHtmlBtns = resultDiv.querySelectorAll('.view-html');
+                    viewHtmlBtns.forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const url = this.getAttribute('data-url');
+                            displayHtmlPreview(url, resultDiv);
+                        });
                     });
-                });
-                
-                const toggleJsonBtns = resultDiv.querySelectorAll('.toggle-json');
-                toggleJsonBtns.forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const jsonContent = this.nextElementSibling;
-                        const isHidden = jsonContent.style.display === 'none';
-                        jsonContent.style.display = isHidden ? 'block' : 'none';
-                        this.textContent = isHidden ? 'Hide Details' : 'Show Details';
+                    
+                    const toggleJsonBtns = resultDiv.querySelectorAll('.toggle-json');
+                    toggleJsonBtns.forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const jsonContent = this.nextElementSibling;
+                            const isHidden = jsonContent.style.display === 'none';
+                            jsonContent.style.display = isHidden ? 'block' : 'none';
+                            this.textContent = isHidden ? 'Hide Details' : 'Show Details';
+                        });
                     });
-                });
+                }
             }
             
-            const toolCall = resultContainer.closest('.tool-call');
-            if (toolCall) {
-                const toolContent = toolCall.querySelector('.tool-content');
-                if (toolContent && toolContent.classList.contains('collapsed')) {
-                    toolContent.classList.remove('collapsed');
-                    
-                    const arrow = toolCall.querySelector('.toggle-arrow');
-                    if (arrow) {
-                        arrow.innerHTML = '&#9660;';
-                    }
-                }
+            // Find the parent tool call div and make sure it remains collapsed
+            const toolCallDiv = resultContainer.closest('.tool-call');
+            const toolContent = toolCallDiv.querySelector('.tool-content');
+            if (toolContent) {
+                // Ensure the content stays collapsed
+                toolContent.classList.add('collapsed');
             }
             
             chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -603,12 +656,58 @@ document.addEventListener('DOMContentLoaded', function() {
                         <button class="btn btn-sm btn-outline-secondary toggle-json">Show Details</button>
                         <pre class="json-content" style="display:none;">${JSON.stringify(parsedResult, null, 2)}</pre>
                     </div>`;
-                } else {
+                } 
+                // Check if this is a command result with generated files
+                else if (parsedResult.status === "success" && parsedResult.generated_files && parsedResult.generated_files.length > 0) {
+                    // First add the regular command output
+                    resultContent += `<pre>${JSON.stringify(parsedResult, null, 2)}</pre>`;
+                    
+                    // Then add a separate section for generated files
+                    resultContent += `<div class="generated-files-section">
+                        <h5>Generated Files:</h5>
+                    </div>`;
+                    
+                    // For each generated file, add rendering based on file type
+                    for (const file of parsedResult.generated_files) {
+                        const fileName = file.file_name || file.file_path.split('/').pop();
+                        
+                        resultContent += `<div class="file-result">
+                            <div class="file-result-header">
+                                <strong>File:</strong> ${fileName}
+                                <a href="${file.file_url}" target="_blank" class="file-download-link">
+                                    <i class="fas fa-download"></i> Download
+                                </a>
+                            </div>`;
+                        
+                        // Handle different file types based on render_type
+                        if (file.render_type === "image") {
+                            resultContent += `<div class="file-preview image-preview">
+                                <img src="${file.file_url}" alt="${fileName}" class="preview-image" />
+                            </div>`;
+                        } else if (file.render_type === "markdown") {
+                            resultContent += `<div class="file-preview markdown-preview-btn">
+                                <button class="btn btn-sm btn-outline-primary view-markdown" data-url="${file.view_url || file.file_url}">
+                                    <i class="fas fa-file-alt"></i> View Markdown
+                                </button>
+                            </div>`;
+                        } else if (file.render_type === "html") {
+                            resultContent += `<div class="file-preview html-preview-btn">
+                                <button class="btn btn-sm btn-outline-primary view-html" data-url="${file.view_url || file.file_url}">
+                                    <i class="fas fa-code"></i> View HTML
+                                </button>
+                            </div>`;
+                        }
+                        
+                        resultContent += `</div>`;  // Close file-result div
+                    }
+                }
+                else {
                     // Regular JSON result - display formatted
                     resultContent = `<pre>${JSON.stringify(parsedResult, null, 2)}</pre>`;
                 }
             } catch (e) {
                 // Not JSON, display as text
+                console.error("Error parsing tool result:", e);
                 resultContent = `<pre>${result}</pre>`;
             }
             
@@ -616,32 +715,35 @@ document.addEventListener('DOMContentLoaded', function() {
             chatMessages.appendChild(standAloneResult);
             
             // Add event listeners for buttons if needed
-            if (parsedResult && parsedResult.render_type) {
-                const viewMarkdownBtns = standAloneResult.querySelectorAll('.view-markdown');
-                viewMarkdownBtns.forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const url = this.getAttribute('data-url');
-                        fetchAndDisplayMarkdown(url, standAloneResult);
+            if (parsedResult) {
+                // Handle file result buttons
+                if (parsedResult.render_type || (parsedResult.generated_files && parsedResult.generated_files.length > 0)) {
+                    const viewMarkdownBtns = standAloneResult.querySelectorAll('.view-markdown');
+                    viewMarkdownBtns.forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const url = this.getAttribute('data-url');
+                            fetchAndDisplayMarkdown(url, standAloneResult);
+                        });
                     });
-                });
-                
-                const viewHtmlBtns = standAloneResult.querySelectorAll('.view-html');
-                viewHtmlBtns.forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const url = this.getAttribute('data-url');
-                        displayHtmlPreview(url, standAloneResult);
+                    
+                    const viewHtmlBtns = standAloneResult.querySelectorAll('.view-html');
+                    viewHtmlBtns.forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const url = this.getAttribute('data-url');
+                            displayHtmlPreview(url, standAloneResult);
+                        });
                     });
-                });
-                
-                const toggleJsonBtns = standAloneResult.querySelectorAll('.toggle-json');
-                toggleJsonBtns.forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const jsonContent = this.nextElementSibling;
-                        const isHidden = jsonContent.style.display === 'none';
-                        jsonContent.style.display = isHidden ? 'block' : 'none';
-                        this.textContent = isHidden ? 'Hide Details' : 'Show Details';
+                    
+                    const toggleJsonBtns = standAloneResult.querySelectorAll('.toggle-json');
+                    toggleJsonBtns.forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            const jsonContent = this.nextElementSibling;
+                            const isHidden = jsonContent.style.display === 'none';
+                            jsonContent.style.display = isHidden ? 'block' : 'none';
+                            this.textContent = isHidden ? 'Hide Details' : 'Show Details';
+                        });
                     });
-                });
+                }
             }
             
             chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -748,33 +850,26 @@ document.addEventListener('DOMContentLoaded', function() {
     function startPollingForUpdates() {
         if (pollingInterval) {
             clearInterval(pollingInterval);
-            console.log("Cleared existing polling interval");
         }
         
         if (!conversationId || !isAutoExecutingTools) {
-            console.log("Not starting polling: conversationId=", conversationId, "isAutoExecuting=", isAutoExecutingTools);
             autoExecutionIndicator.style.display = 'none';
             return;
         }
-        
-        console.log("Starting to poll for conversation", conversationId);
         
         autoExecutionIndicator.style.display = 'block';
         
         pollingInterval = setInterval(() => {
             if (!isAutoExecutingTools) {
-                console.log("Auto execution flag turned off, stopping polling");
                 clearInterval(pollingInterval);
                 autoExecutionIndicator.style.display = 'none';
                 return;
             }
             
-            console.log("Polling for updates...");
             fetch(`${API_URL}/api/conversation/${conversationId}/messages`)
                 .then(response => {
                     if (!response.ok) {
                         if (response.status === 404) {
-                            console.log("No new messages yet");
                             return null;
                         }
                         throw new Error(`HTTP error! status: ${response.status}`);
@@ -783,18 +878,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
                 .then(data => {
                     if (data && data.messages && data.messages.length > 0) {
-                        console.log("Received new messages, status:", data.status);
                         updateChatWithNewMessages(data.messages);
                         
                         // Even when conversation is marked as complete,
                         // we keep isAutoExecutingTools true to allow continued interaction
                         if (data.status === "completed") {
-                            console.log("Conversation marked as complete, stopping polling but keeping auto-execute enabled");
                             clearInterval(pollingInterval);
                             autoExecutionIndicator.style.display = 'none';
                         }
-                    } else if (data) {
-                        console.log("Received response but no new messages, status:", data.status);
                     }
                 })
                 .catch(error => {
@@ -879,14 +970,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // If new tool calls are detected, ensure polling continues
         if (hasNewToolCalls) {
-            console.log("Found new tool calls, ensuring polling continues");
             isAutoExecutingTools = true;
             autoExecutionIndicator.style.display = 'block';
         }
         
         // If tool results are detected, ensure polling continues for assistant responses
         if (hasToolResults) {
-            console.log("Found tool results, ensuring polling continues for assistant response");
             isAutoExecutingTools = true;
             autoExecutionIndicator.style.display = 'block';
         }

@@ -2,10 +2,16 @@ import json
 import logging
 import os
 import mimetypes
+import sys
 from typing import List, Dict, Any, Callable, Optional, Union
 from .file_tools import save_file, read_file
 from .command_tools import run_command, install_python_package
 from .web_tools import search, extract_content
+
+# Add the app directory to the Python path to allow importing from api
+app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if app_dir not in sys.path:
+    sys.path.append(app_dir)
 
 logger = logging.getLogger(__name__)
 
@@ -235,53 +241,90 @@ def post_process_save_file(result: Dict[str, Any], conversation_id: Optional[str
         Enhanced result containing file rendering information
     """
     try:
+        logger.info(f"Post-processing save_file result: {json.dumps(result)}")
         # Ensure result is in dictionary format
         if isinstance(result, str):
             try:
                 result = json.loads(result)
+                logger.info("Converted string result to dictionary")
             except:
+                logger.warning(f"Failed to parse result as JSON: {result}")
                 return result
         
         # Only process successfully saved files
         if result.get("status") == "success" and "file_path" in result:
             file_path = result["file_path"]
             file_name = os.path.basename(file_path)
+            logger.info(f"Processing successful file save: {file_path}")
             
             # If we have a conversation ID and root directory
             if conversation_id and conversation_id in CONVERSATION_ROOT_DIRS:
                 root_dir = CONVERSATION_ROOT_DIRS[conversation_id]
+                logger.info(f"Found root directory for conversation {conversation_id}: {root_dir}")
                 
                 # Get path relative to the conversation root directory
                 rel_path = os.path.relpath(file_path, root_dir)
+                logger.info(f"Relative path: {rel_path}")
                 
                 # Add URL for accessing the file
-                result["file_url"] = f"/api/conversation/{conversation_id}/files/{rel_path}"
+                file_url = f"/api/conversation/{conversation_id}/files/{rel_path}"
+                result["file_url"] = file_url
+                logger.info(f"Added file_url: {file_url}")
                 
                 # Add rendering information based on file type
                 content_type, _ = mimetypes.guess_type(file_path)
+                logger.info(f"Determined content type: {content_type}")
+                
+                # Check for file extension as backup
+                file_extension = os.path.splitext(file_path)[1].lower()
+                logger.info(f"File extension: {file_extension}")
                 
                 # Handle image files
-                if content_type and content_type.startswith('image/'):
+                if content_type and content_type.startswith('image/') or file_extension in ['.png', '.jpg', '.jpeg', '.gif', '.bmp']:
+                    if not content_type:
+                        # Assign content type based on extension if not detected
+                        if file_extension == '.png':
+                            content_type = 'image/png'
+                        elif file_extension in ['.jpg', '.jpeg']:
+                            content_type = 'image/jpeg'
+                        elif file_extension == '.gif':
+                            content_type = 'image/gif'
+                        elif file_extension == '.bmp':
+                            content_type = 'image/bmp'
+                        logger.info(f"Assigned content type from extension: {content_type}")
+                    
                     result["render_type"] = "image"
+                    result["content_type"] = content_type
                     result["markdown_render"] = f"![{file_name}]({result['file_url']})"
-                    logger.info(f"Enhanced result for image file: {file_path}")
+                    logger.info(f"Enhanced result for image file: {file_path} with render_type=image")
+                    
+                    # Check if file exists and get size
+                    if os.path.exists(file_path):
+                        file_size = os.path.getsize(file_path)
+                        result["file_size"] = file_size
+                        logger.info(f"Added file size: {file_size} bytes")
                     
                 # Handle Markdown files
                 elif file_path.lower().endswith('.md'):
                     result["render_type"] = "markdown"
                     result["view_url"] = result["file_url"]
-                    logger.info(f"Enhanced result for markdown file: {file_path}")
+                    logger.info(f"Enhanced result for markdown file: {file_path} with render_type=markdown")
                     
                 # Handle HTML files
                 elif file_path.lower().endswith('.html'):
                     result["render_type"] = "html"
                     result["view_url"] = result["file_url"]
-                    logger.info(f"Enhanced result for html file: {file_path}")
+                    logger.info(f"Enhanced result for html file: {file_path} with render_type=html")
+                else:
+                    logger.info(f"No special rendering applied for file type: {content_type}")
                 
-                logger.info(f"Enhanced save_file result with rendering info for: {file_path}")
-            
+                logger.info(f"Final enhanced result: {json.dumps(result)}")
+            else:
+                logger.warning(f"Missing conversation_id or root directory: {conversation_id}")
     except Exception as e:
         logger.error(f"Error post-processing file result: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         # If error occurs, return the original result
         pass
     
@@ -289,89 +332,378 @@ def post_process_save_file(result: Dict[str, Any], conversation_id: Optional[str
 
 def process_tool_calls(tool_calls: List[Dict[str, Any]], conversation_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """
-    Process tool calls from Claude and execute them.
+    Process a list of tool calls and return results.
     
     Args:
-        tool_calls: List of tool call objects from Claude
+        tool_calls: List of tool calls to process
         conversation_id: Optional conversation ID for context
         
     Returns:
-        List of tool result objects in the format expected by Claude
+        List of tool results
     """
     tool_results = []
     
     for tool_call in tool_calls:
-        tool_name = tool_call.get("name")
-        tool_input = tool_call.get("input", {})
-        tool_id = tool_call.get("id")
-        
-        logger.info(f"Processing tool call: {tool_name} with input: {tool_input}")
-        
-        result = None
-        
-        # Check if the tool exists
-        if tool_name in TOOL_FUNCTIONS:
-            try:
-                # Call the appropriate function
-                function = TOOL_FUNCTIONS[tool_name]
+        try:
+            tool_name = tool_call.get("name")
+            tool_input = tool_call.get("input", {})
+            tool_id = tool_call.get("id")
+            
+            logger.info(f"Processing tool call: {tool_name} with input: {json.dumps(tool_input)}")
+            
+            # Process file paths with conversation root directory
+            if tool_name == "save_file" and "file_path" in tool_input and conversation_id:
+                result = save_file_with_root(tool_input["file_path"], tool_input["content"], conversation_id)
+                # Post-process the result to add rendering information
+                result = post_process_save_file(result, conversation_id)
+            elif tool_name == "read_file" and "file_path" in tool_input and conversation_id:
+                content = read_file_with_root(tool_input["file_path"], conversation_id)
+                result = {"status": "success", "content": content}
+            elif tool_name == "run_terminal_command":
+                command = tool_input.get("command", "")
+                cwd = tool_input.get("cwd")
+                result = run_command_with_root(command, cwd, conversation_id)
                 
-                # Add conversation_id parameter if the function accepts it
-                if tool_name in ["save_file", "read_file", "run_terminal_command"]:
-                    result = function(**tool_input, conversation_id=conversation_id)
-                else:
-                    result = function(**tool_input)
+                # Post-process command result to check for generated files
+                if result.get("status") == "success" and conversation_id:
+                    result = post_process_command_result(result, conversation_id)
                     
-                # 对保存文件的结果进行后处理
-                if tool_name == "save_file":
-                    result = post_process_save_file(result, conversation_id)
-                    
-            except Exception as e:
-                logger.error(f"Error executing tool {tool_name}: {str(e)}")
-                result = {
-                    "status": "error",
-                    "message": f"Error executing tool {tool_name}: {str(e)}"
-                }
-        else:
-            logger.error(f"Unknown tool: {tool_name}")
-            result = {
+            elif tool_name == "install_python_package":
+                package_name = tool_input.get("package_name", "")
+                upgrade = tool_input.get("upgrade", False)
+                command = f"pip install {'--upgrade ' if upgrade else ''}{package_name}"
+                result = run_command(command)
+            elif tool_name == "web_search":
+                query = tool_input.get("query", "")
+                max_results = tool_input.get("max_results", 10)
+                max_retries = tool_input.get("max_retries", 3)
+                result = search(query, max_results, max_retries)
+            elif tool_name == "extract_web_content":
+                urls = tool_input.get("urls", [])
+                max_concurrent = tool_input.get("max_concurrent", 3)
+                result = extract_content(urls, max_concurrent)
+            else:
+                result = {"status": "error", "message": f"Unknown tool: {tool_name}"}
+                
+            # Check if we need to add the tool_use_id to the result for tool result association
+            if tool_id:
+                logger.info(f"Tool call complete for ID {tool_id}: {result.get('status', 'unknown')}")
+                tool_results.append({
+                    "tool_use_id": tool_id,
+                    "content": json.dumps(result, ensure_ascii=False)
+                })
+            else:
+                logger.warning(f"Tool call missing ID: {tool_name}")
+                # Still add the result without association
+                tool_results.append({
+                    "tool_use_id": f"unknown_{len(tool_results)}",
+                    "content": json.dumps(result, ensure_ascii=False)
+                })
+                
+        except Exception as e:
+            logger.error(f"Error processing tool call: {str(e)}")
+            
+            # Include the error in the tool result
+            error_result = {
                 "status": "error",
-                "message": f"Unknown tool: {tool_name}"
+                "message": f"Error processing tool call: {str(e)}"
             }
-        
-        # Convert result to JSON string if it's not already a string
-        result_str = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False)
-        logger.info(f"Tool call result: {result}")
-        
-        # Format the result as expected by Claude
-        tool_results.append({
-            "tool_use_id": tool_id,
-            "content": result_str
-        })
+            
+            if "id" in tool_call:
+                tool_results.append({
+                    "tool_use_id": tool_call["id"],
+                    "content": json.dumps(error_result, ensure_ascii=False)
+                })
+            else:
+                tool_results.append({
+                    "tool_use_id": f"error_{len(tool_results)}",
+                    "content": json.dumps(error_result, ensure_ascii=False)
+                })
     
     return tool_results
 
-def format_tool_results_for_claude(tool_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def post_process_command_result(result: Dict[str, Any], conversation_id: Optional[str] = None) -> Dict[str, Any]:
     """
-    Format tool results as content blocks in a user message for Claude.
+    Post-process command execution results to detect created files using Claude.
     
     Args:
-        tool_results: List of tool result objects
+        result: Command execution result
+        conversation_id: Conversation ID
         
     Returns:
-        List of content blocks in the format expected by Claude
+        Enhanced result with file rendering information if files were created
     """
-    tool_result_blocks = []
-    for result in tool_results:
-        # Create basic tool result block - only including fields expected by Claude API
-        tool_result_block = {
-            "type": "tool_result",
-            "tool_use_id": result["tool_use_id"],
-            "content": result["content"]
-        }
+    try:
+        logger.info(f"Post-processing command result for conversation {conversation_id}")
         
-        # Note: We no longer add extra fields as Claude API rejects additional inputs
-        # Frontend needs to parse file URLs and rendering information from the content string
+        if conversation_id not in CONVERSATION_ROOT_DIRS:
+            logger.warning(f"No root directory found for conversation {conversation_id}")
+            return result
+            
+        root_dir = CONVERSATION_ROOT_DIRS[conversation_id]
         
-        tool_result_blocks.append(tool_result_block)
+        # Extract command and outputs
+        command = result.get("command", "")
+        stdout = result.get("stdout", "")
+        stderr = result.get("stderr", "")
+        
+        # Skip if empty output
+        if not stdout and not stderr:
+            return result
+            
+        # Use Claude to detect generated files
+        try:
+            # Try to import the Anthropic client from app.py
+            try:
+                from api.app import client
+            except (ImportError, AttributeError):
+                # Try to create a new client if import fails
+                try:
+                    import anthropic
+                    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+                except Exception as e:
+                    logger.error(f"Failed to create Anthropic client: {str(e)}")
+                    return result
+            
+            # Prepare the prompt for Claude
+            prompt = f"""Given the following command and its output, identify any files that were generated or created. 
+            
+Command:
+```
+{command}
+```
+
+Standard Output:
+```
+{stdout}
+```
+
+Standard Error:
+```
+{stderr}
+```
+
+Please return a JSON array of the filenames that were created during this command execution. 
+Only include files that were NEWLY CREATED by this command (not just referenced or read).
+Return an empty array if no files were created.
+Format your response as a valid JSON array of strings, e.g. ["file1.png", "path/to/file2.txt"]. 
+Just return the raw JSON array with no additional text or explanation.
+"""
+            
+            # Call Claude to analyze the command and output
+            try:
+                response = client.messages.create(
+                    max_tokens=1024,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": prompt,
+                        }
+                    ],
+                    model="claude-3-7-sonnet-20250219",
+                )
+                
+                # Extract content from response based on its structure
+                claude_content = ""
+                if hasattr(response, 'content'):
+                    if isinstance(response.content, list) and len(response.content) > 0:
+                        # Handle content blocks format (Anthropic API v2)
+                        for content_block in response.content:
+                            if hasattr(content_block, 'type') and content_block.type == 'text':
+                                if hasattr(content_block, 'text'):
+                                    claude_content = content_block.text
+                                    break
+                            elif isinstance(content_block, dict):
+                                if content_block.get('type') == 'text' and 'text' in content_block:
+                                    claude_content = content_block['text']
+                                    break
+                    elif isinstance(response.content, str):
+                        claude_content = response.content
+                # Legacy API support
+                elif hasattr(response, 'completion'):
+                    claude_content = response.completion
+                
+                # Parse the JSON array - expected to be a list of filenames
+                import json
+                try:
+                    # Try to find a JSON array in the response
+                    import re
+                    json_array_match = re.search(r'\[.*\]', claude_content)
+                    if json_array_match:
+                        potential_json = json_array_match.group(0)
+                        detected_files = json.loads(potential_json)
+                    else:
+                        detected_files = json.loads(claude_content)
+                        
+                    if not isinstance(detected_files, list):
+                        detected_files = []
+                except json.JSONDecodeError:
+                    detected_files = []
+                    
+                # Process the detected files
+                enhanced_files = []
+                for file_name in detected_files:
+                    if not isinstance(file_name, str):
+                        continue
+                        
+                    # Try to locate this file
+                    full_path = find_file_in_workspace(file_name, root_dir)
+                    
+                    # Skip if file not found
+                    if not full_path:
+                        continue
+                        
+                    file_info = create_file_info(full_path, root_dir, conversation_id)
+                    enhanced_files.append(file_info)
+                    
+                # Add found files to the result
+                if enhanced_files:
+                    result["generated_files"] = enhanced_files
+                    
+                    # If we found exactly one image file, add its rendering information directly to the result
+                    # This helps with backward compatibility with the frontend
+                    image_files = [f for f in enhanced_files if f.get("render_type") == "image"]
+                    if len(image_files) == 1:
+                        image_file = image_files[0]
+                        result["file_path"] = image_file["file_path"]
+                        result["file_url"] = image_file["file_url"]
+                        result["render_type"] = "image"
+                        result["content_type"] = image_file["content_type"]
+                        result["markdown_render"] = image_file["markdown_render"]
+                        
+                    logger.info(f"Added {len(enhanced_files)} generated files to result")
+                
+            except Exception as e:
+                logger.error(f"Error calling Claude API: {str(e)}")
+                return result
+                
+        except Exception as e:
+            logger.error(f"Error using Claude for file detection: {str(e)}")
+            
+    except Exception as e:
+        logger.error(f"Error post-processing command result: {str(e)}")
+        
+    return result
+
+def find_file_in_workspace(file_name: str, root_dir: str) -> Optional[str]:
+    """
+    Try to find a file in the workspace.
     
-    return tool_result_blocks 
+    Args:
+        file_name: Name of the file to find
+        root_dir: Root directory to search in
+        
+    Returns:
+        Full path to the file if found, None otherwise
+    """
+    # Try in the cwd first, but also search in subdirectories
+    for root, dirs, files in os.walk(root_dir):
+        if file_name in files:
+            return os.path.join(root, file_name)
+            
+    # If the path contains directories, handle that too
+    if os.path.dirname(file_name):
+        candidate_path = os.path.join(root_dir, file_name)
+        if os.path.exists(candidate_path):
+            return candidate_path
+    
+    # If it still hasn't been found, try just the base filename
+    base_name = os.path.basename(file_name)
+    for root, dirs, files in os.walk(root_dir):
+        if base_name in files:
+            return os.path.join(root, base_name)
+    
+    return None
+
+def create_file_info(full_path: str, root_dir: str, conversation_id: str) -> Dict[str, Any]:
+    """
+    Create file information dictionary for a file.
+    
+    Args:
+        full_path: Full path to the file
+        root_dir: Root directory
+        conversation_id: Conversation ID
+        
+    Returns:
+        Dictionary with file information
+    """
+    file_size = os.path.getsize(full_path)
+    rel_path = os.path.relpath(full_path, root_dir)
+    file_url = f"/api/conversation/{conversation_id}/files/{rel_path}"
+    
+    # Get content type
+    content_type, _ = mimetypes.guess_type(full_path)
+    file_extension = os.path.splitext(full_path)[1].lower()
+    
+    # Add specific content types for common file extensions
+    if not content_type:
+        if file_extension == '.png':
+            content_type = 'image/png'
+        elif file_extension in ['.jpg', '.jpeg']:
+            content_type = 'image/jpeg'
+        elif file_extension == '.gif':
+            content_type = 'image/gif'
+        elif file_extension == '.md':
+            content_type = 'text/markdown'
+        elif file_extension == '.html':
+            content_type = 'text/html'
+    
+    # Create file info
+    file_info = {
+        "file_path": full_path,
+        "file_name": os.path.basename(full_path),
+        "relative_path": rel_path,
+        "file_url": file_url,
+        "file_size": file_size,
+        "content_type": content_type
+    }
+    
+    # Add render type based on file type
+    if content_type and content_type.startswith('image/') or file_extension in ['.png', '.jpg', '.jpeg', '.gif']:
+        file_info["render_type"] = "image"
+        file_info["markdown_render"] = f"![{os.path.basename(full_path)}]({file_url})"
+    elif file_extension == '.md':
+        file_info["render_type"] = "markdown"
+        file_info["view_url"] = file_url
+    elif file_extension == '.html':
+        file_info["render_type"] = "html"
+        file_info["view_url"] = file_url
+        
+    return file_info
+
+def format_tool_results_for_claude(tool_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Format tool results for Claude's API format.
+    
+    Args:
+        tool_results: List of tool results
+        
+    Returns:
+        List of content blocks formatted for Claude API
+    """
+    formatted_results = []
+    
+    for result in tool_results:
+        try:
+            logger.info(f"Formatting tool result: {json.dumps(result)}")
+            tool_use_id = result.get("tool_use_id")
+            content = result.get("content")
+            
+            if tool_use_id and content:
+                formatted_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_use_id,
+                    "content": content
+                })
+                logger.info(f"Successfully formatted tool result for tool_use_id: {tool_use_id}")
+                # Add a debug log of the first few characters of content to verify formatting
+                if isinstance(content, str) and len(content) > 0:
+                    preview = content[:100] + "..." if len(content) > 100 else content
+                    logger.info(f"Tool result content preview: {preview}")
+            else:
+                logger.warning(f"Invalid tool result format - missing tool_use_id or content: {result}")
+        except Exception as e:
+            logger.error(f"Error formatting tool result: {str(e)}")
+    
+    logger.info(f"Formatted {len(formatted_results)} tool results for Claude")
+    return formatted_results 
