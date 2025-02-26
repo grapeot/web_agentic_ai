@@ -394,17 +394,7 @@ pre code {
     max-width: 70%;
 }
 
-.auto-execution-message {
-    background-color: #f0fdfa;
-    border: 1px solid #a7f3d0;
-    color: #065f46;
-    font-size: 0.9rem;
-    max-width: 50%;
-    padding: 8px 12px;
-    font-style: normal;
-}
-
-/* 工具调用折叠/展开样式 */
+/* Tool call collapsible/expandable styles */
 .tool-call-header {
     cursor: pointer;
     padding: 8px 0;
@@ -473,12 +463,6 @@ pre code {
 
 .tool-result-container {
     margin-top: 12px;
-}
-
-.tool-result-loading {
-    font-style: italic;
-    color: #9ca3af;
-    padding: 6px 0;
 }
 
 .tool-result {

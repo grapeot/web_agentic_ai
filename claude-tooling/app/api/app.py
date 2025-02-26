@@ -169,7 +169,7 @@ async def auto_execute_tool_calls(tool_calls: List[Dict[str, Any]], conversation
             })
         return error_results
 
-# 修改chat路由，添加自动工具执行功能
+# Modified chat route to support automatic tool execution
 @app.post("/api/chat", response_model=UserResponse)
 async def chat(request: UserRequest, background_tasks: BackgroundTasks):
     """
@@ -307,18 +307,25 @@ async def chat(request: UserRequest, background_tasks: BackgroundTasks):
             {"role": "assistant", "content": content}
         ])
         
-        # 如果启用了自动执行工具且有工具调用，自动处理并递归处理后续调用
+        # If auto-execute tools is enabled and there are tool calls, process them in the background
         if request.auto_execute_tools and tool_calls:
             logger.info("Automatic tool execution enabled, starting tool task")
             
             # Create a background task to handle tool calls and continue conversation
             background_tasks.add_task(process_tool_calls_and_continue, tool_calls, conversation_id, request.max_tokens, request.thinking_mode, request.thinking_budget_tokens, request.auto_execute_tools)
+            
+            # Don't include tool calls in the response when auto-execution is enabled
+            # The frontend will get them through polling instead
+            tool_calls_for_response = []
+        else:
+            # For manual execution, include tool calls in the response
+            tool_calls_for_response = tool_calls
         
         # Prepare the response
         return UserResponse(
             message=Message(role="assistant", content=content),
             conversation_id=conversation_id,
-            tool_calls=tool_calls,
+            tool_calls=tool_calls_for_response,
             thinking=thinking
         )
         
@@ -326,7 +333,7 @@ async def chat(request: UserRequest, background_tasks: BackgroundTasks):
         logger.error(f"Error processing chat request: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# 修改process_tool_calls_and_continue函数，添加中断检查
+# Modified process_tool_calls_and_continue function to add interruption checks
 async def process_tool_calls_and_continue(
     tool_calls: List[Dict[str, Any]], 
     conversation_id: str, 
@@ -501,7 +508,7 @@ async def process_tool_calls_and_continue(
         if conversation_id in auto_execute_tasks and auto_execute_tasks[conversation_id] not in ["cancelled", "error"]:
             auto_execute_tasks[conversation_id] = "completed"
 
-# 修改/api/tool-results端点，使其支持自动工具调用标志
+# Modified /api/tool-results endpoint to support automatic tool execution flag
 @app.post("/api/tool-results", response_model=UserResponse)
 async def submit_tool_results(
     tool_output: ToolOutput,

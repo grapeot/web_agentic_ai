@@ -24,10 +24,12 @@ WARNING: the project is mainly for demo purpose only, not for production use. It
    # Basic single-worker mode (default)
    python claude-tooling/run.py
    
-   # Multi-worker mode for better concurrency
+   # Multi-worker mode for better concurrency. 
+   # WARNING: It still has some issues. Ideally we would need an external data source to share data between workers.
    python claude-tooling/run.py --workers 4
    
    # Production mode with Gunicorn (Linux/Mac only)
+   # WARNING: It still has some issues. Ideally we would need an external data source to share data between workers.
    python claude-tooling/run.py --use-gunicorn --workers 9
    ```
 

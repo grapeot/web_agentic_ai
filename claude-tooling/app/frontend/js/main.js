@@ -81,12 +81,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             autoExecutionIndicator.style.display = 'none';
             
-            // Remove auto-execution status message
-            const statusMsg = document.querySelector('.auto-execution-message');
-            if (statusMsg) {
-                statusMsg.remove();
-            }
-            
             addMessageToChat('system', 'Auto tool execution cancelled');
         }
     });
@@ -196,6 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // If auto-execute tools is enabled, don't show the tool result input modal, start polling instead
                 if (autoExecuteToolsSwitch.checked) {
+                    console.log("Tool calls found in initial response with auto-execute enabled, starting polling");
                     isAutoExecutingTools = true;
                     waitingForToolResult = false;
                     startPollingForUpdates();
@@ -205,6 +200,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     toolResultTextarea.value = '';
                     toolResultModal.show();
                 }
+            } else if (autoExecuteToolsSwitch.checked) {
+                // Even if no immediate tool calls, if auto-execute is on, we should start polling
+                // This helps with tools that might be triggered by the backend directly
+                console.log("No immediate tool calls, but auto-execute is enabled - starting polling anyway");
+                isAutoExecutingTools = true;
+                startPollingForUpdates();
             }
         })
         .catch(error => {
@@ -247,6 +248,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // If auto-execute tools is enabled, don't show the tool result input modal, start polling instead
                 if (autoExecuteToolsSwitch.checked) {
+                    console.log("Tool calls found with auto-execute enabled, continuing polling");
                     isAutoExecutingTools = true;
                     waitingForToolResult = false;
                     startPollingForUpdates();
@@ -258,6 +260,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             } else {
                 waitingForToolResult = false;
+                // Even if no immediate tool calls, if auto-execute is on, ensure we continue polling
+                if (autoExecuteToolsSwitch.checked) {
+                    console.log("No immediate tool calls after tool result, but ensuring polling continues");
+                    isAutoExecutingTools = true;
+                    startPollingForUpdates();
+                }
             }
         })
         .catch(error => {
@@ -290,6 +298,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function processAssistantMessage(content) {
         let textContent = '';
+        let toolCalls = []; // 用于存储工具调用信息
         
         // Create a set of already displayed tool IDs
         const displayedToolIds = new Set();
@@ -299,23 +308,30 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
+        // 第一次遍历：收集文本内容和工具调用
         for (const item of content) {
             if (item.type === 'text') {
                 textContent += item.text;
             } else if (item.type === 'tool_use' && !displayedToolIds.has(item.id)) {
-                // Process tool call - only if not already displayed
-                lastToolCallId = item.id;
-                addToolCallToChat({
+                // 存储工具调用信息，但暂不显示
+                toolCalls.push({
                     id: item.id,
                     name: item.name,
                     input: item.input
                 });
                 displayedToolIds.add(item.id); // Add to the displayed set
+                lastToolCallId = item.id;
             }
         }
         
+        // 先显示文本内容（解释）
         if (textContent) {
             addMessageToChat('assistant', textContent);
+        }
+        
+        // 然后显示工具调用
+        for (const toolCall of toolCalls) {
+            addToolCallToChat(toolCall);
         }
         
         // Save the assistant message to conversation history
@@ -426,11 +442,7 @@ document.addEventListener('DOMContentLoaded', function() {
         resultContainer.className = 'tool-result-container';
         resultContainer.dataset.forToolId = toolCall.id;
         
-        // Add loading indicator
-        const loading = document.createElement('div');
-        loading.className = 'tool-result-loading';
-        loading.innerHTML = '<div class="spinner"></div><p>Executing tool...</p>';
-        resultContainer.appendChild(loading);
+        // No loading indicator anymore, we'll just have an empty container until results arrive
         
         content.appendChild(resultContainer);
         toolCallDiv.appendChild(content);
@@ -444,8 +456,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const resultContainer = document.querySelector(`.tool-result-container[data-for-tool-id="${toolUseId}"]`);
         
         if (resultContainer) {
-            // Clear loading state
-            resultContainer.innerHTML = '';
+            // No need to clear loading state as we don't have it anymore
             
             // Create result content
             const resultDiv = document.createElement('div');
@@ -522,40 +533,33 @@ document.addEventListener('DOMContentLoaded', function() {
     function startPollingForUpdates() {
         if (pollingInterval) {
             clearInterval(pollingInterval);
+            console.log("Cleared existing polling interval");
         }
         
         if (!conversationId || !isAutoExecutingTools) {
+            console.log("Not starting polling: conversationId=", conversationId, "isAutoExecuting=", isAutoExecutingTools);
             autoExecutionIndicator.style.display = 'none';
             return;
         }
         
-        // Show auto-execution progress indicator
+        console.log("Starting to poll for conversation", conversationId);
+        
+        // Show auto-execution indicator with cancel button
         autoExecutionIndicator.style.display = 'block';
         
-        // Add status message only once when polling starts
-        if (!document.querySelector('.auto-execution-message')) {
-            const statusMsg = document.createElement('div');
-            statusMsg.className = 'message system-message auto-execution-message';
-            statusMsg.textContent = 'Auto-executing tools...';
-            chatMessages.appendChild(statusMsg);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
+        // Remove the status message display - we won't show "Auto-executing tools..." anymore
+        // We'll only keep the indicator with cancel button
         
-        // Check for new messages every 1.5 seconds
+        // Check for new messages every 5 seconds
         pollingInterval = setInterval(() => {
             if (!isAutoExecutingTools) {
+                console.log("Auto execution flag turned off, stopping polling");
                 clearInterval(pollingInterval);
                 autoExecutionIndicator.style.display = 'none';
-                
-                // Remove auto-execution status message
-                const statusMsg = document.querySelector('.auto-execution-message');
-                if (statusMsg) {
-                    statusMsg.remove();
-                }
-                
                 return;
             }
             
+            console.log("Polling for updates...");
             fetch(`${API_URL}/api/conversation/${conversationId}/messages`)
                 .then(response => {
                     if (!response.ok) {
@@ -569,27 +573,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
                 .then(data => {
                     if (data && data.messages && data.messages.length > 0) {
+                        console.log("Received new messages, status:", data.status);
                         // Process new messages
                         updateChatWithNewMessages(data.messages);
                         
                         // If conversation is completed, stop polling
                         if (data.status === "completed") {
+                            console.log("Conversation marked as complete, stopping polling");
                             isAutoExecutingTools = false;
                             clearInterval(pollingInterval);
                             autoExecutionIndicator.style.display = 'none';
-                            
-                            // Remove auto-execution status message
-                            const statusMsg = document.querySelector('.auto-execution-message');
-                            if (statusMsg) {
-                                statusMsg.remove();
-                            }
                         }
+                    } else if (data) {
+                        console.log("Received response but no new messages, status:", data.status);
                     }
                 })
                 .catch(error => {
                     console.error("Error polling for updates:", error);
                 });
-        }, 1500);
+        }, 5000); // Check every 5 seconds
     }
     
     // Process new messages and update UI
@@ -613,6 +615,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
+        let hasNewToolCalls = false; // Track if we found new tool calls
+        
         // Iterate through new messages
         for (let i = lastMessageIndex + 1; i < newMessages.length; i++) {
             const msg = newMessages[i];
@@ -622,26 +626,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (msg.content) {
                     let textContent = '';
                     let hasNewToolCall = false;
+                    let newToolCalls = []; // 存储新的工具调用
                     
-                    // First check content, filter already displayed tool calls
+                    // 第一次遍历：收集文本内容和工具调用
                     for (const item of msg.content) {
                         if (item.type === 'text') {
                             textContent += item.text;
                         } else if (item.type === 'tool_use' && !displayedToolIds.has(item.id)) {
-                            // Only add tool calls not already displayed
+                            // 收集工具调用但暂不显示
                             displayedToolIds.add(item.id);
                             lastToolCallId = item.id;
-                            addToolCallToChat({
+                            newToolCalls.push({
                                 id: item.id,
                                 name: item.name,
                                 input: item.input
                             });
                             hasNewToolCall = true;
+                            hasNewToolCalls = true; // Update the outer flag
                         }
                     }
                     
+                    // 先显示文本内容（解释）
                     if (textContent) {
                         addMessageToChat('assistant', textContent);
+                    }
+                    
+                    // 然后显示工具调用
+                    for (const toolCall of newToolCalls) {
+                        addToolCallToChat(toolCall);
                     }
                     
                     // Only add message to history if it has new tool calls or text content
@@ -665,6 +677,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     messages.push(msg);
                 }
             }
+        }
+        
+        // Make sure we keep auto-execution mode active if we found new tool calls
+        if (hasNewToolCalls) {
+            console.log("Found new tool calls, ensuring polling continues");
+            isAutoExecutingTools = true;
+            autoExecutionIndicator.style.display = 'block';
         }
     }
 }); 
