@@ -42,7 +42,7 @@ ENV/
 screenshots/
 logs/
 *.log
-claude-tooling/temp/
+claude-tooling/runs/
 
 # JavaScript/Frontend
 node_modules/
