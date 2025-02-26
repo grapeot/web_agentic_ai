@@ -8,12 +8,13 @@ import json
 import logging
 import time
 import datetime
+import mimetypes
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Union
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse, JSONResponse, FileResponse, HTMLResponse
 from pydantic import BaseModel
 import anthropic
 from dotenv import load_dotenv
@@ -82,7 +83,7 @@ class ToolOutput(BaseModel):
     
 class UserRequest(BaseModel):
     messages: List[Message]
-    max_tokens: int = 8192
+    max_tokens: int = 4096
     temperature: float = 0.7
     thinking_mode: bool = True
     thinking_budget_tokens: int = 2000
@@ -132,7 +133,7 @@ def create_conversation_root_dir(conversation_id: str) -> str:
 # 添加一个新的路由参数
 class UserRequest(BaseModel):
     messages: List[Message]
-    max_tokens: int = 8192
+    max_tokens: int = 4096
     temperature: float = 0.7
     thinking_mode: bool = True
     thinking_budget_tokens: int = 2000
@@ -181,15 +182,15 @@ async def chat(request: UserRequest, background_tasks: BackgroundTasks, conversa
     try:
         logger.info("Received chat request")
         
-        # First check if conversation_id is provided in URL parameters
+        # 首先检查URL参数中是否提供了conversation_id
         if not conversation_id:
-            # If not provided in URL, try to extract from system messages in request body
+            # 如果URL参数中没有提供，尝试从请求体的系统消息中提取
             for message in request.messages:
                 if message.role == "system" and any(content.get("conversation_id") for content in message.content if isinstance(content, dict)):
                     conversation_id = next((content.get("conversation_id") for content in message.content if isinstance(content, dict) and "conversation_id" in content), None)
                     break
         
-        # If still not found, create a new conversation_id
+        # 如果仍未找到，创建新的conversation_id
         if not conversation_id:
             conversation_id = f"conv_{int(time.time())}"
             logger.info(f"Created new conversation ID: {conversation_id}")
@@ -557,7 +558,7 @@ async def submit_tool_results(
                   "5. Always provide complete, self-contained code that can run without user interaction\n"\
                   "6. Assume your code runs in a script context, not an interactive notebook",
             messages=history,
-            max_tokens=8192,
+            max_tokens=4096,
             temperature=1.0,  # Must be 1.0 when thinking is enabled
             tools=TOOL_DEFINITIONS,
             thinking={
@@ -625,7 +626,7 @@ async def submit_tool_results(
                 process_tool_calls_and_continue, 
                 tool_calls, 
                 conversation_id, 
-                8192,  # max_tokens 
+                4096,  # max_tokens 
                 True,  # thinking_mode
                 2000,  # thinking_budget_tokens
                 auto_execute_tools
@@ -675,7 +676,7 @@ async def get_conversation_messages(conversation_id: str):
         history = conversations[conversation_id]
         
         # Check conversation status
-        # If the last message is from the assistant and has no tool calls, conversation is considered complete
+        # Find the last message, if it's assistant message and no tool calls, then consider conversation completed
         status = "in_progress"
         if history and len(history) > 0:
             last_message = history[-1]
@@ -754,6 +755,106 @@ async def cancel_auto_execution(conversation_id: str):
         
     except Exception as e:
         logger.error(f"Error cancelling automatic execution: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 添加一个新的端点用于提供会话目录中的文件
+@app.get("/api/conversation/{conversation_id}/files/{file_path:path}")
+async def serve_conversation_file(conversation_id: str, file_path: str):
+    """
+    提供会话目录中的文件。
+    支持各种文件类型，如PNG、Markdown、HTML等。
+    """
+    try:
+        logger.info(f"Requested file {file_path} from conversation {conversation_id}")
+        
+        if conversation_id not in conversation_root_dirs:
+            logger.error(f"Conversation not found: {conversation_id}")
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        root_dir = conversation_root_dirs[conversation_id]
+        full_path = os.path.join(root_dir, file_path)
+        
+        if not os.path.exists(full_path):
+            logger.error(f"File not found: {full_path}")
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        # 根据文件扩展名确定内容类型
+        content_type, _ = mimetypes.guess_type(full_path)
+        
+        # 返回文件响应
+        logger.info(f"Serving file {full_path} with content type {content_type}")
+        return FileResponse(full_path, media_type=content_type)
+        
+    except Exception as e:
+        logger.error(f"Error serving file: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 添加一个新的端点用于列出会话目录中的文件
+@app.get("/api/conversation/{conversation_id}/files")
+async def list_conversation_files(conversation_id: str):
+    """
+    列出会话目录中的所有文件。
+    可用于前端显示文件列表。
+    """
+    try:
+        logger.info(f"Listing files for conversation {conversation_id}")
+        
+        if conversation_id not in conversation_root_dirs:
+            logger.error(f"Conversation not found: {conversation_id}")
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        root_dir = conversation_root_dirs[conversation_id]
+        
+        if not os.path.exists(root_dir):
+            logger.error(f"Conversation directory not found: {root_dir}")
+            raise HTTPException(status_code=404, detail="Conversation directory not found")
+        
+        # 遍历目录并收集文件信息
+        files = []
+        for root, dirs, filenames in os.walk(root_dir):
+            for filename in filenames:
+                file_path = os.path.join(root, filename)
+                rel_path = os.path.relpath(file_path, root_dir)
+                
+                # 获取文件类型
+                content_type, _ = mimetypes.guess_type(file_path)
+                file_type = "unknown"
+                
+                if content_type:
+                    if content_type.startswith('image/'):
+                        file_type = "image"
+                    elif content_type == 'text/markdown' or filename.endswith('.md'):
+                        file_type = "markdown"
+                    elif content_type == 'text/html' or filename.endswith('.html'):
+                        file_type = "html"
+                    elif content_type.startswith('text/'):
+                        file_type = "text"
+                    else:
+                        file_type = content_type.split('/')[0]
+                
+                # 计算文件大小
+                file_size = os.path.getsize(file_path)
+                
+                # 生成访问文件的URL
+                file_url = f"/api/conversation/{conversation_id}/files/{rel_path}"
+                
+                files.append({
+                    "name": filename,
+                    "path": rel_path,
+                    "type": file_type,
+                    "content_type": content_type,
+                    "size": file_size,
+                    "url": file_url
+                })
+        
+        return {
+            "conversation_id": conversation_id,
+            "root_dir": root_dir,
+            "files": files
+        }
+        
+    except Exception as e:
+        logger.error(f"Error listing conversation files: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import mimetypes
 from typing import List, Dict, Any, Callable, Optional, Union
 from .file_tools import save_file, read_file
 from .command_tools import run_command, install_python_package
@@ -221,6 +222,71 @@ TOOL_FUNCTIONS = {
     "extract_web_content": extract_content
 }
 
+# Add a function to enhance file save results
+def post_process_save_file(result: Dict[str, Any], conversation_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Post-process file save results, adding file rendering information.
+    
+    Args:
+        result: The result of the file save operation
+        conversation_id: Conversation ID
+        
+    Returns:
+        Enhanced result containing file rendering information
+    """
+    try:
+        # Ensure result is in dictionary format
+        if isinstance(result, str):
+            try:
+                result = json.loads(result)
+            except:
+                return result
+        
+        # Only process successfully saved files
+        if result.get("status") == "success" and "file_path" in result:
+            file_path = result["file_path"]
+            file_name = os.path.basename(file_path)
+            
+            # If we have a conversation ID and root directory
+            if conversation_id and conversation_id in CONVERSATION_ROOT_DIRS:
+                root_dir = CONVERSATION_ROOT_DIRS[conversation_id]
+                
+                # Get path relative to the conversation root directory
+                rel_path = os.path.relpath(file_path, root_dir)
+                
+                # Add URL for accessing the file
+                result["file_url"] = f"/api/conversation/{conversation_id}/files/{rel_path}"
+                
+                # Add rendering information based on file type
+                content_type, _ = mimetypes.guess_type(file_path)
+                
+                # Handle image files
+                if content_type and content_type.startswith('image/'):
+                    result["render_type"] = "image"
+                    result["markdown_render"] = f"![{file_name}]({result['file_url']})"
+                    logger.info(f"Enhanced result for image file: {file_path}")
+                    
+                # Handle Markdown files
+                elif file_path.lower().endswith('.md'):
+                    result["render_type"] = "markdown"
+                    result["view_url"] = result["file_url"]
+                    logger.info(f"Enhanced result for markdown file: {file_path}")
+                    
+                # Handle HTML files
+                elif file_path.lower().endswith('.html'):
+                    result["render_type"] = "html"
+                    result["view_url"] = result["file_url"]
+                    logger.info(f"Enhanced result for html file: {file_path}")
+                
+                logger.info(f"Enhanced save_file result with rendering info for: {file_path}")
+            
+    except Exception as e:
+        logger.error(f"Error post-processing file result: {str(e)}")
+        # If error occurs, return the original result
+        pass
+    
+    return result
+
 def process_tool_calls(tool_calls: List[Dict[str, Any]], conversation_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Process tool calls from Claude and execute them.
@@ -254,6 +320,11 @@ def process_tool_calls(tool_calls: List[Dict[str, Any]], conversation_id: Option
                     result = function(**tool_input, conversation_id=conversation_id)
                 else:
                     result = function(**tool_input)
+                    
+                # 对保存文件的结果进行后处理
+                if tool_name == "save_file":
+                    result = post_process_save_file(result, conversation_id)
+                    
             except Exception as e:
                 logger.error(f"Error executing tool {tool_name}: {str(e)}")
                 result = {
@@ -291,10 +362,16 @@ def format_tool_results_for_claude(tool_results: List[Dict[str, Any]]) -> List[D
     """
     tool_result_blocks = []
     for result in tool_results:
-        tool_result_blocks.append({
+        # Create basic tool result block - only including fields expected by Claude API
+        tool_result_block = {
             "type": "tool_result",
             "tool_use_id": result["tool_use_id"],
             "content": result["content"]
-        })
+        }
+        
+        # Note: We no longer add extra fields as Claude API rejects additional inputs
+        # Frontend needs to parse file URLs and rendering information from the content string
+        
+        tool_result_blocks.append(tool_result_block)
     
     return tool_result_blocks 
