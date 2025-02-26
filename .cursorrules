@@ -25,5 +25,10 @@ The goal is to help you maintain a big picture as well as the progress of the ta
 - Add debug information to stderr while keeping the main output clean in stdout for better pipeline integration
 - When using seaborn styles in matplotlib, use 'seaborn-v0_8' instead of 'seaborn' as the style name due to recent seaborn version changes
 - Use 'gpt-4o' as the model name for OpenAI's GPT-4 with vision capabilities
+- When using Anthropic API tool calling:
+  - Tool results should be formatted with `tool_use_id` (not `tool_call_id`) and `content` (not `output`)
+  - Tool results should be included as content blocks in a user message, not as a separate `tool_outputs` parameter
+  - Assistant messages containing `tool_use` blocks must be followed by user messages with matching `tool_result` blocks
+  - Preserve the complete response structure in conversation history, not just the extracted text
 
 # Scratchpad

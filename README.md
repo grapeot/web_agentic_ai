@@ -1,6 +1,6 @@
-# Cursor Web
+# cursor-web
 
-A Cursor-like AI development environment with advanced agentic capabilities, but provide a Web interface.
+A Cursor-powered AI development environment with advanced agentic capabilities.
 
 ## Quick Start
 
@@ -36,55 +36,36 @@ The project includes tests to verify functionality:
    ```
    Press Ctrl+C at any time to interrupt the execution.
 
-## Available Tools
+### Auto Tool Execution
 
-Your project includes several powerful tools in the `tools/` directory:
+The auto tool execution feature allows Claude to automatically execute tool calls and continue the conversation after receiving a user request, without requiring the user to manually submit the results of each tool call.
 
-### LLM Integration
-```python
-from tools.llm_api import query_llm
+#### Features
 
-# Use LLM for assistance
-response = query_llm(
-    "Your question here",
-    provider="anthropic"  # Options: openai, anthropic, azure_openai, deepseek, gemini
-)
-print(response)
+- Fully automatic tool call execution without manual input
+- Real-time execution progress display in the web interface
+- Cancel function to stop ongoing automatic execution
+- Switchable between automatic and manual modes
+
+#### Usage
+
+**Web Interface:**
+1. Open the Web interface (http://localhost:8004)
+2. Enable "Auto Execute Tools" in the settings panel
+3. Input your request and send
+4. Watch the automatic execution progress until completion
+
+**Command Line Testing:**
+```bash
+python claude-tooling/tests/test_auto_execute.py "Create a simple Python script to calculate the sum from 1 to 100"
 ```
 
-### Web Scraping
-```python
-from tools.web_scraper import scrape_urls
+#### Implementation Details
 
-# Scrape web content
-results = scrape_urls(["https://example.com"], max_concurrent=3)
-```
-
-### Search Engine
-```python
-from tools.search_engine import search
-
-# Search the web
-results = search("your search keywords")
-```
-
-
-### Screenshot Verification
-```python
-from tools.screenshot_utils import take_screenshot_sync
-from tools.llm_api import query_llm
-
-# Take and analyze screenshots
-screenshot_path = take_screenshot_sync('https://example.com', 'screenshot.png')
-analysis = query_llm(
-    "Describe this webpage",
-    provider="openai",
-    image_path=screenshot_path
-)
-```
-
-Note: When you first use the screenshot verification feature, Playwright browsers will be installed automatically.
-
+- Backend: Uses `auto_execute_tools` parameter to control automatic execution
+- Frontend: Includes progress indicators and polling mechanism for latest results
+- For developers: Set `auto_execute_tools=true` in API requests to enable this feature
+- Limitations: Only supports built-in tools; complex interactive tools may still require user intervention
 
 ## AI Assistant Configuration
 
@@ -94,24 +75,6 @@ This project uses `.cursorrules` to configure the AI assistant. The assistant ca
 - Verify screenshots
 - Perform web searches
 - Analyze images and code
-
-
-## Environment Variables
-
-Configure these in your `.env` file:
-
-- `LLM_API_KEY`: Your LLM API key (optional)
-- `AZURE_OPENAI_API_KEY`: Azure OpenAI API key (optional)
-- `AZURE_OPENAI_ENDPOINT`: Azure OpenAI endpoint (optional)
-- `AZURE_OPENAI_MODEL_DEPLOYMENT`: Azure OpenAI model deployment name (optional)
-- `SILICONFLOW_API_KEY`: Siliconflow API key (optional)
-Note: Basic functionality works without API keys. Advanced features (like multimodal analysis) require appropriate API keys.
-
-## Development Tools
-
-- `.devcontainer/`: VS Code development container configuration
-- `.vscode.example/`: Recommended VS Code settings
-- `.github/`: CI/CD workflows
 
 ## License
 
