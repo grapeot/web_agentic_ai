@@ -22,7 +22,7 @@ def print_json(data):
     """Print JSON data in a readable format."""
     print(json.dumps(data, indent=2))
 
-def test_web_search(query, max_results=5):
+def run_web_search(query, max_results=5):
     """Test the web search functionality."""
     print(f"\n===== Testing Web Search =====")
     print(f"Query: {query}")
@@ -43,7 +43,7 @@ def test_web_search(query, max_results=5):
     
     return results
 
-def test_extract_content(urls, max_concurrent=2):
+def run_extract_content(urls, max_concurrent=2):
     """Test the web content extraction functionality."""
     print(f"\n===== Testing Web Content Extraction =====")
     print(f"URLs: {urls}")
@@ -84,13 +84,13 @@ def main():
     args = parser.parse_args()
     
     if args.command == "search":
-        test_web_search(args.query, args.max_results)
+        run_web_search(args.query, args.max_results)
     elif args.command == "extract":
-        test_extract_content(args.urls, args.max_concurrent)
+        run_extract_content(args.urls, args.max_concurrent)
     elif args.command == "all":
         # Run both tests with example inputs
-        test_web_search("latest developments in artificial intelligence")
-        test_extract_content(["https://www.example.com", "https://en.wikipedia.org/wiki/Main_Page"])
+        run_web_search("latest developments in artificial intelligence")
+        run_extract_content(["https://www.example.com", "https://en.wikipedia.org/wiki/Main_Page"])
     else:
         parser.print_help()
 
