@@ -1,8 +1,0 @@
-[Cursor] 修复web_tools和自动执行工具功能
-
-- 使用nest_asyncio库解决了"Cannot run the event loop while another loop is running"错误
-- 修复了synchronous wrapper函数中的事件循环问题
-- 更新了API请求格式，确保消息结构符合服务器期望
-- 将nest_asyncio添加到requirements.txt依赖中
-- 更新了服务器端口配置（8000→8004）
-- 完成了web搜索和自动执行工具的功能测试
