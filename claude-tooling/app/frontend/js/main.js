@@ -53,6 +53,17 @@ document.addEventListener('DOMContentLoaded', function() {
         chatMessages.innerHTML = '';
         messages = [];
         conversationId = null;
+        currentToolUseId = null;
+        waitingForToolResult = false;
+        isAutoExecutingTools = false;
+        
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+        }
+        
+        autoExecutionIndicator.style.display = 'none';
+        console.log("Chat cleared, all state reset");
     });
     
     sendButton.addEventListener('click', sendMessage);
@@ -149,60 +160,61 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         responseSpinner.style.display = 'block';
-        fetch(`${API_URL}/api/chat`, {
+        
+        // 基础API端点
+        let apiEndpoint = `${API_URL}/api/chat`;
+        
+        // 如果有会话ID，通过URL参数传递
+        if (conversationId) {
+            apiEndpoint += `?conversation_id=${encodeURIComponent(conversationId)}`;
+            console.log("Continuing conversation:", conversationId);
+        }
+        
+        let requestOptions = {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(requestBody)
-        })
+        };
+        
+        fetch(apiEndpoint, requestOptions)
         .then(response => response.json())
         .then(data => {
             responseSpinner.style.display = 'none';
             
-            // Update conversation ID
             if (data.conversation_id) {
                 conversationId = data.conversation_id;
             }
             
-            // If thinking is provided, show it
             if (data.thinking) {
                 addThinkingToChat(data.thinking);
             }
             
-            // Check if message exists
             if (data.message && data.message.content) {
-                // Process message content
                 processAssistantMessage(data.message.content);
             } else {
-                // Handle case where message is not present
                 console.error('Response missing message field:', data);
                 addMessageToChat('assistant', 'Error: Failed to get a proper response from Claude. Please try again.');
             }
             
-            // Check if there are tool calls
             if (data.tool_calls && data.tool_calls.length > 0) {
                 const toolCall = data.tool_calls[0];
                 addToolCallToChat(toolCall);
                 
-                // Store the tool use ID
                 currentToolUseId = toolCall.id;
                 
-                // If auto-execute tools is enabled, don't show the tool result input modal, start polling instead
                 if (autoExecuteToolsSwitch.checked) {
                     console.log("Tool calls found in initial response with auto-execute enabled, starting polling");
                     isAutoExecutingTools = true;
                     waitingForToolResult = false;
                     startPollingForUpdates();
                 } else {
-                    // Manual mode, show tool result input dialog
                     waitingForToolResult = true;
                     toolResultTextarea.value = '';
                     toolResultModal.show();
                 }
             } else if (autoExecuteToolsSwitch.checked) {
-                // Even if no immediate tool calls, if auto-execute is on, we should start polling
-                // This helps with tools that might be triggered by the backend directly
                 console.log("No immediate tool calls, but auto-execute is enabled - starting polling anyway");
                 isAutoExecutingTools = true;
                 startPollingForUpdates();
@@ -234,33 +246,27 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             responseSpinner.style.display = 'none';
             
-            // Process message content
             processAssistantMessage(data.message.content);
             
-            // Check if there are tool calls
             if (data.tool_calls && data.tool_calls.length > 0) {
                 waitingForToolResult = true;
                 const toolCall = data.tool_calls[0];
                 addToolCallToChat(toolCall);
                 
-                // Store the tool use ID
                 currentToolUseId = toolCall.id;
                 
-                // If auto-execute tools is enabled, don't show the tool result input modal, start polling instead
                 if (autoExecuteToolsSwitch.checked) {
                     console.log("Tool calls found with auto-execute enabled, continuing polling");
                     isAutoExecutingTools = true;
                     waitingForToolResult = false;
                     startPollingForUpdates();
                 } else {
-                    // Manual mode, show tool result input dialog
                     waitingForToolResult = true;
                     toolResultTextarea.value = '';
                     toolResultModal.show();
                 }
             } else {
                 waitingForToolResult = false;
-                // Even if no immediate tool calls, if auto-execute is on, ensure we continue polling
                 if (autoExecuteToolsSwitch.checked) {
                     console.log("No immediate tool calls after tool result, but ensuring polling continues");
                     isAutoExecutingTools = true;
@@ -298,9 +304,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function processAssistantMessage(content) {
         let textContent = '';
-        let toolCalls = []; // 用于存储工具调用信息
+        let toolCalls = [];
         
-        // Create a set of already displayed tool IDs
         const displayedToolIds = new Set();
         document.querySelectorAll('.tool-call').forEach(el => {
             if (el.dataset.toolId) {
@@ -308,33 +313,28 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        // 第一次遍历：收集文本内容和工具调用
         for (const item of content) {
             if (item.type === 'text') {
                 textContent += item.text;
             } else if (item.type === 'tool_use' && !displayedToolIds.has(item.id)) {
-                // 存储工具调用信息，但暂不显示
                 toolCalls.push({
                     id: item.id,
                     name: item.name,
                     input: item.input
                 });
-                displayedToolIds.add(item.id); // Add to the displayed set
+                displayedToolIds.add(item.id);
                 lastToolCallId = item.id;
             }
         }
         
-        // 先显示文本内容（解释）
         if (textContent) {
             addMessageToChat('assistant', textContent);
         }
         
-        // 然后显示工具调用
         for (const toolCall of toolCalls) {
             addToolCallToChat(toolCall);
         }
         
-        // Save the assistant message to conversation history
         messages.push({
             role: 'assistant',
             content: content
@@ -348,12 +348,10 @@ document.addEventListener('DOMContentLoaded', function() {
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
         
-        // Apply syntax highlighting to code blocks
         document.querySelectorAll('pre code').forEach((block) => {
             hljs.highlightBlock(block);
         });
         
-        // If this is a user message, add it to history
         if (role === 'user') {
             messages.push({
                 role: 'user',
@@ -372,7 +370,6 @@ document.addEventListener('DOMContentLoaded', function() {
         chatMessages.appendChild(thinkingDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
         
-        // Apply syntax highlighting to code blocks
         document.querySelectorAll('pre code').forEach((block) => {
             hljs.highlightBlock(block);
         });
@@ -381,14 +378,14 @@ document.addEventListener('DOMContentLoaded', function() {
     function addToolCallToChat(toolCall) {
         const toolCallDiv = document.createElement('div');
         toolCallDiv.className = 'message tool-call';
-        toolCallDiv.dataset.toolId = toolCall.id; // Add tool ID as data attribute
+        toolCallDiv.dataset.toolId = toolCall.id;
         
         const header = document.createElement('div');
         header.className = 'tool-call-header';
         
         const arrow = document.createElement('span');
         arrow.className = 'toggle-arrow';
-        arrow.innerHTML = '&#9654;'; // Right arrow (expand)
+        arrow.innerHTML = '&#9654;';
         header.appendChild(arrow);
         
         const headerText = document.createElement('span');
@@ -400,7 +397,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const content = document.createElement('div');
         content.className = 'tool-content collapsed';
         
-        // Add tool input parameters
         if (toolCall.input) {
             const inputLabel = document.createElement('div');
             inputLabel.className = 'tool-section-label';
@@ -410,29 +406,23 @@ document.addEventListener('DOMContentLoaded', function() {
             const toolInput = document.createElement('div');
             toolInput.className = 'tool-input';
             
-            // Beautify JSON display
             try {
                 let jsonInput;
                 if (typeof toolCall.input === 'string') {
-                    // Try to parse JSON string
                     jsonInput = JSON.parse(toolCall.input);
                 } else {
-                    // Already an object
                     jsonInput = toolCall.input;
                 }
                 
-                // Use formatted JSON for display
                 const formattedJson = JSON.stringify(jsonInput, null, 2);
                 toolInput.innerHTML = `<pre>${formattedJson}</pre>`;
             } catch (e) {
-                // If not valid JSON or error occurs, display original input
                 toolInput.innerHTML = `<pre>${toolCall.input}</pre>`;
             }
             
             content.appendChild(toolInput);
         }
         
-        // Create a container for tool results, to be filled later
         const resultLabel = document.createElement('div');
         resultLabel.className = 'tool-section-label';
         resultLabel.textContent = 'Result:';
@@ -442,8 +432,6 @@ document.addEventListener('DOMContentLoaded', function() {
         resultContainer.className = 'tool-result-container';
         resultContainer.dataset.forToolId = toolCall.id;
         
-        // No loading indicator anymore, we'll just have an empty container until results arrive
-        
         content.appendChild(resultContainer);
         toolCallDiv.appendChild(content);
         
@@ -452,50 +440,39 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function addToolResultToChat(result, toolUseId) {
-        // Find the result container for the corresponding tool call
         const resultContainer = document.querySelector(`.tool-result-container[data-for-tool-id="${toolUseId}"]`);
         
         if (resultContainer) {
-            // No need to clear loading state as we don't have it anymore
-            
-            // Create result content
             const resultDiv = document.createElement('div');
             resultDiv.className = 'tool-result';
             resultDiv.dataset.resultId = toolUseId;
             
             let resultContent = '';
             try {
-                // Try to parse and format JSON
                 const jsonResult = JSON.parse(result);
                 resultContent = `<pre>${JSON.stringify(jsonResult, null, 2)}</pre>`;
             } catch (e) {
-                // If not valid JSON, display original text
                 resultContent = `<pre>${result}</pre>`;
             }
             
             resultDiv.innerHTML = resultContent;
             resultContainer.appendChild(resultDiv);
             
-            // Auto-expand the tool content when result is received
             const toolCall = resultContainer.closest('.tool-call');
             if (toolCall) {
                 const toolContent = toolCall.querySelector('.tool-content');
                 if (toolContent && toolContent.classList.contains('collapsed')) {
-                    // Remove collapsed class
                     toolContent.classList.remove('collapsed');
                     
-                    // Update arrow icon
                     const arrow = toolCall.querySelector('.toggle-arrow');
                     if (arrow) {
-                        arrow.innerHTML = '&#9660;'; // Down arrow (collapse)
+                        arrow.innerHTML = '&#9660;';
                     }
                 }
             }
             
-            // Ensure chat window scrolls to the latest message
             chatMessages.scrollTop = chatMessages.scrollHeight;
         } else {
-            // If no corresponding tool call container found, create standalone result
             console.warn(`Tool container with ID ${toolUseId} not found, creating standalone result`);
             
             const standAloneResult = document.createElement('div');
@@ -504,11 +481,9 @@ document.addEventListener('DOMContentLoaded', function() {
             
             let resultContent = '';
             try {
-                // Try to parse and format JSON
                 const jsonResult = JSON.parse(result);
                 resultContent = `<pre>${JSON.stringify(jsonResult, null, 2)}</pre>`;
             } catch (e) {
-                // If not valid JSON, display original text
                 resultContent = `<pre>${result}</pre>`;
             }
             
@@ -518,7 +493,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Helper function for HTML escaping
     function escapeHtml(text) {
         return text
             .replace(/&/g, '&amp;')
@@ -529,7 +503,6 @@ document.addEventListener('DOMContentLoaded', function() {
             .replace(/\n/g, '<br>');
     }
 
-    // Polling function: Get new messages for conversation
     function startPollingForUpdates() {
         if (pollingInterval) {
             clearInterval(pollingInterval);
@@ -544,13 +517,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         console.log("Starting to poll for conversation", conversationId);
         
-        // Show auto-execution indicator with cancel button
         autoExecutionIndicator.style.display = 'block';
         
-        // Remove the status message display - we won't show "Auto-executing tools..." anymore
-        // We'll only keep the indicator with cancel button
-        
-        // Check for new messages every 5 seconds
         pollingInterval = setInterval(() => {
             if (!isAutoExecutingTools) {
                 console.log("Auto execution flag turned off, stopping polling");
@@ -574,13 +542,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(data => {
                     if (data && data.messages && data.messages.length > 0) {
                         console.log("Received new messages, status:", data.status);
-                        // Process new messages
                         updateChatWithNewMessages(data.messages);
                         
-                        // If conversation is completed, stop polling
+                        // Even when conversation is marked as complete,
+                        // we keep isAutoExecutingTools true to allow continued interaction
                         if (data.status === "completed") {
-                            console.log("Conversation marked as complete, stopping polling");
-                            isAutoExecutingTools = false;
+                            console.log("Conversation marked as complete, stopping polling but keeping auto-execute enabled");
                             clearInterval(pollingInterval);
                             autoExecutionIndicator.style.display = 'none';
                         }
@@ -591,15 +558,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 .catch(error => {
                     console.error("Error polling for updates:", error);
                 });
-        }, 5000); // Check every 5 seconds
+        }, 5000);
     }
     
-    // Process new messages and update UI
     function updateChatWithNewMessages(newMessages) {
-        // Ignore already processed messages
         let lastMessageIndex = messages.length - 1;
         
-        // Create a set of displayed tool call IDs
         const displayedToolIds = new Set();
         document.querySelectorAll('.tool-call').forEach(el => {
             if (el.dataset.toolId) {
@@ -607,7 +571,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        // Create a set of displayed tool result IDs
         const displayedResultIds = new Set();
         document.querySelectorAll('.tool-result').forEach(el => {
             if (el.dataset.resultId) {
@@ -615,25 +578,22 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        let hasNewToolCalls = false; // Track if we found new tool calls
+        let hasNewToolCalls = false;
+        let hasToolResults = false;
         
-        // Iterate through new messages
         for (let i = lastMessageIndex + 1; i < newMessages.length; i++) {
             const msg = newMessages[i];
             
             if (msg.role === "assistant") {
-                // Process assistant messages
                 if (msg.content) {
                     let textContent = '';
                     let hasNewToolCall = false;
-                    let newToolCalls = []; // 存储新的工具调用
+                    let newToolCalls = [];
                     
-                    // 第一次遍历：收集文本内容和工具调用
                     for (const item of msg.content) {
                         if (item.type === 'text') {
                             textContent += item.text;
                         } else if (item.type === 'tool_use' && !displayedToolIds.has(item.id)) {
-                            // 收集工具调用但暂不显示
                             displayedToolIds.add(item.id);
                             lastToolCallId = item.id;
                             newToolCalls.push({
@@ -642,46 +602,49 @@ document.addEventListener('DOMContentLoaded', function() {
                                 input: item.input
                             });
                             hasNewToolCall = true;
-                            hasNewToolCalls = true; // Update the outer flag
+                            hasNewToolCalls = true;
                         }
                     }
                     
-                    // 先显示文本内容（解释）
                     if (textContent) {
                         addMessageToChat('assistant', textContent);
                     }
                     
-                    // 然后显示工具调用
                     for (const toolCall of newToolCalls) {
                         addToolCallToChat(toolCall);
                     }
                     
-                    // Only add message to history if it has new tool calls or text content
                     if (textContent || hasNewToolCall) {
                         messages.push(msg);
                     }
                 }
             } else if (msg.role === "user" && msg.content && msg.content.length > 0) {
-                // Look for tool result messages
                 let hasToolResult = false;
                 for (const item of msg.content) {
                     if (item.type === "tool_result" && !displayedResultIds.has(item.tool_use_id)) {
                         displayedResultIds.add(item.tool_use_id);
                         addToolResultToChat(item.content, item.tool_use_id);
                         hasToolResult = true;
+                        hasToolResults = true;
                     }
                 }
                 
-                // Only add message to history if it has new tool results
                 if (hasToolResult) {
                     messages.push(msg);
                 }
             }
         }
         
-        // Make sure we keep auto-execution mode active if we found new tool calls
+        // If new tool calls are detected, ensure polling continues
         if (hasNewToolCalls) {
             console.log("Found new tool calls, ensuring polling continues");
+            isAutoExecutingTools = true;
+            autoExecutionIndicator.style.display = 'block';
+        }
+        
+        // If tool results are detected, ensure polling continues for assistant responses
+        if (hasToolResults) {
+            console.log("Found tool results, ensuring polling continues for assistant response");
             isAutoExecutingTools = true;
             autoExecutionIndicator.style.display = 'block';
         }
