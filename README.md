@@ -17,6 +17,18 @@ A Cursor-like AI development environment with advanced agentic capabilities, on 
    - Copy `.env.example` to `.env` if you haven't already
    - Add your API keys in `.env` (optional)
 
+3. Run the server:
+   ```bash
+   # Basic single-worker mode (default)
+   python claude-tooling/run.py
+   
+   # Multi-worker mode for better concurrency
+   python claude-tooling/run.py --workers 4
+   
+   # Production mode with Gunicorn (Linux/Mac only)
+   python claude-tooling/run.py --use-gunicorn --workers 9
+   ```
+
 ## Features
 
 - **Advanced AI Assistant** configured via `.cursorrules`
@@ -25,6 +37,7 @@ A Cursor-like AI development environment with advanced agentic capabilities, on 
 - **Command Execution** capabilities for terminal operations
 - **Web Tools** for searching and extracting web content
 - **Conversation Root Directories** - Each conversation is automatically assigned a unique directory in `runs/<timestamp>` for better organization of generated files
+- **Server Concurrency** - Support for multiple workers to handle concurrent requests for better performance
 
 ## Testing
 

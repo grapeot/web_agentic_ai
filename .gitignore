@@ -43,6 +43,7 @@ screenshots/
 logs/
 *.log
 claude-tooling/runs/
+commit_message.txt
 
 # JavaScript/Frontend
 node_modules/

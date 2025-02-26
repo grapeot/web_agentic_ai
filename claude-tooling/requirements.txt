@@ -13,3 +13,4 @@ playwright
 html5lib
 asyncio
 nest_asyncio
+gunicorn
