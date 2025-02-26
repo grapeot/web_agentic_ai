@@ -32,24 +32,3 @@ The goal is to help you maintain a big picture as well as the progress of the ta
   - Preserve the complete response structure in conversation history, not just the extracted text
 
 # Scratchpad
-
-## Task: Ensure JSON dumps non-ASCII characters properly
-The task is to modify app.py to ensure that when JSON is dumped for frontend rendering, `ensure_ascii=False` is set so that non-ASCII characters are displayed properly without Unicode escaping.
-
-Plan:
-[X] Find all instances of json.dumps() in app.py
-[X] Add ensure_ascii=False parameter to each instance
-[X] Test that non-ASCII characters display correctly
-[ ] Commit the changes
-
-## Task: Render newlines in tool call results
-The task is to properly render newline characters (\n) as actual line breaks in tool call results.
-
-Plan:
-[X] Create a new branch
-[X] Review the JavaScript code that handles rendering tool call results
-[X] Modify index.html to ensure newlines are properly rendered as line breaks
-[X] Test the changes
-[X] Commit the changes
-
-✅ Task completed! The changes have been committed to the new branch 'fix/render-newlines-in-tool-results'.

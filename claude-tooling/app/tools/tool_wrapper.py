@@ -89,7 +89,7 @@ TOOL_DEFINITIONS = [
                 },
                 "max_results": {
                     "type": "integer",
-                    "description": "Maximum number of results to return (optional, default: 10)"
+                    "description": "Maximum number of results to return (optional, default: 10, recommended: 10 for balance of comprehensiveness and relevance)"
                 },
                 "max_retries": {
                     "type": "integer",
