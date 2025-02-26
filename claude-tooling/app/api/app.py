@@ -49,8 +49,8 @@ try:
     logger.info("Anthropic client initialized successfully")
 
     # Inject the client into the chat router
-    from .routes.chat import client as chat_client
-    chat_client = client
+    from .routes.chat import set_anthropic_client
+    set_anthropic_client(client)
 
 except Exception as e:
     logger.error(f"Failed to initialize Anthropic client: {str(e)}")

@@ -29,7 +29,8 @@ if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
 # Import the FastAPI app for testing
-from app.api.app import app, client, conversations, conversation_root_dirs, auto_execute_tasks
+from app.api.app import app, client
+from app.api.services.conversation import conversations, conversation_root_dirs, auto_execute_tasks
 
 # Initialize TestClient
 test_client = TestClient(app)
@@ -125,27 +126,35 @@ class MockMessagesResponse:
 @pytest.fixture
 def mock_anthropic_client():
     """Create a mock for the Anthropic client"""
-    with patch('app.api.app.client') as mock_client:
+    with patch('app.api.routes.chat.client') as mock_client:
         # Configure the mock response for messages.create
         mock_create = MagicMock()
         mock_create.return_value = MockMessagesResponse(MOCK_CLAUDE_RESPONSE["content"])
         mock_client.messages.create = mock_create
-        yield mock_client
+        
+        # Mock the set_anthropic_client function to ensure client is properly set
+        with patch('app.api.routes.chat.set_anthropic_client') as mock_set_client:
+            mock_set_client.side_effect = lambda c: None
+            yield mock_client
 
 @pytest.fixture
 def mock_anthropic_client_with_tool_call():
     """Create a mock for the Anthropic client that returns a tool call"""
-    with patch('app.api.app.client') as mock_client:
+    with patch('app.api.routes.chat.client') as mock_client:
         # Configure the mock response for messages.create
         mock_create = MagicMock()
         mock_create.return_value = MockMessagesResponse(MOCK_CLAUDE_RESPONSE_WITH_TOOL_CALL["content"])
         mock_client.messages.create = mock_create
-        yield mock_client
+        
+        # Mock the set_anthropic_client function to ensure client is properly set
+        with patch('app.api.routes.chat.set_anthropic_client') as mock_set_client:
+            mock_set_client.side_effect = lambda c: None
+            yield mock_client
 
 @pytest.fixture
 def mock_tool_processing():
     """Mock the tool processing functions"""
-    with patch('app.api.app.process_tool_calls') as mock_process:
+    with patch('app.api.tools.tool_wrapper.process_tool_calls') as mock_process:
         mock_process.return_value = [
             {
                 "tool_use_id": "tool_call_12345",

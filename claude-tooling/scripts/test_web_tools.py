@@ -16,7 +16,7 @@ if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
 # Import the tools
-from app.tools.web_tools import search, extract_content
+from app.api.tools.web_tools import search, extract_content
 
 def print_json(data):
     """Print JSON data in a readable format."""

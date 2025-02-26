@@ -27,7 +27,7 @@ if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
 # Import the tools
-from app.tools.web_tools import (
+from app.api.tools.web_tools import (
     search, extract_content, 
     web_search, search_with_retry, format_search_results, 
     extract_web_content, validate_url, parse_html
@@ -140,7 +140,7 @@ class TestWebSearch(unittest.TestCase):
         self.assertIn("https://example.com/page1", formatted)
         self.assertIn("This is the first example search result.", formatted)
     
-    @patch('app.tools.web_tools.search_with_retry')
+    @patch('app.api.tools.web_tools.search_with_retry')
     def test_web_search_success(self, mock_search):
         """Test web search with successful results."""
         # Setup mock
@@ -154,7 +154,7 @@ class TestWebSearch(unittest.TestCase):
         self.assertEqual(result["results"], MOCK_SEARCH_RESULTS)
         self.assertIn("formatted_results", result)
     
-    @patch('app.tools.web_tools.search_with_retry')
+    @patch('app.api.tools.web_tools.search_with_retry')
     def test_web_search_empty(self, mock_search):
         """Test web search with no results."""
         # Setup mock
@@ -168,7 +168,7 @@ class TestWebSearch(unittest.TestCase):
         self.assertEqual(result["results"], [])
         self.assertIn("no results found", result["message"].lower())
     
-    @patch('app.tools.web_tools.search_with_retry')
+    @patch('app.api.tools.web_tools.search_with_retry')
     def test_web_search_error(self, mock_search):
         """Test web search with error."""
         # Setup mock
@@ -181,7 +181,7 @@ class TestWebSearch(unittest.TestCase):
         self.assertEqual(result["status"], "error")
         self.assertIn("error", result["message"].lower())
     
-    @patch('app.tools.web_tools.web_search')
+    @patch('app.api.tools.web_tools.web_search')
     def test_search_wrapper(self, mock_web_search):
         """Test the synchronous wrapper for web_search."""
         # Setup mock
@@ -245,7 +245,7 @@ class TestWebContentExtraction(unittest.TestCase):
         self.assertNotIn("This should be skipped", result)
         self.assertNotIn("color: black", result)
     
-    @patch('app.tools.web_tools.process_urls')
+    @patch('app.api.tools.web_tools.process_urls')
     def test_extract_web_content_success(self, mock_process_urls):
         """Test successful web content extraction."""
         # Setup mock
@@ -275,7 +275,7 @@ class TestWebContentExtraction(unittest.TestCase):
         self.assertEqual(result["status"], "error")
         self.assertIn("No valid URLs", result["message"])
     
-    @patch('app.tools.web_tools.process_urls')
+    @patch('app.api.tools.web_tools.process_urls')
     def test_extract_web_content_error(self, mock_process_urls):
         """Test web content extraction with processing error."""
         # Setup mock to raise exception
@@ -289,7 +289,7 @@ class TestWebContentExtraction(unittest.TestCase):
         self.assertEqual(result["status"], "error")
         self.assertIn("error", result["message"].lower())
     
-    @patch('app.tools.web_tools.extract_web_content')
+    @patch('app.api.tools.web_tools.extract_web_content')
     def test_extract_content_wrapper(self, mock_extract_web_content):
         """Test the synchronous wrapper for extract_web_content."""
         # Setup mock

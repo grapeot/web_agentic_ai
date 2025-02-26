@@ -41,7 +41,7 @@ def create_conversation_root_dir(conversation_id: str) -> str:
     logger.info(f"Created root directory for conversation {conversation_id}: {root_dir}")
     
     # Import here to avoid circular imports
-    from ...tools.tool_wrapper import set_conversation_root_dir
+    from ..tools.tool_wrapper import set_conversation_root_dir
     
     # Update the tool wrapper with the conversation root directory
     set_conversation_root_dir(conversation_id, root_dir)

@@ -28,8 +28,14 @@ logger = logging.getLogger(__name__)
 # Create router
 router = APIRouter(prefix="/api")
 
-# Anthropic client - will be injected from app.py
+# Anthropic client - will be set from app.py
 client = None
+
+def set_anthropic_client(anthropic_client):
+    """Set the Anthropic client for this module"""
+    global client
+    client = anthropic_client
+    logger.info("Anthropic client set in chat router")
 
 @router.post("/chat", response_model=UserResponse)
 async def chat(request: UserRequest, background_tasks: BackgroundTasks, conversation_id: Optional[str] = None):
