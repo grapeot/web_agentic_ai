@@ -666,12 +666,13 @@ async def get_conversation_messages(conversation_id: str):
     Get message history for a specific conversation.
     Used for front-end polling to get results of automatic tool execution and new assistant responses.
     """
+    logger.info(f"Getting messages for conversation {conversation_id}")
+    
+    if conversation_id not in conversations:
+        logger.warning(f"Conversation not found: {conversation_id}")
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
     try:
-        logger.info(f"Getting messages for conversation {conversation_id}")
-        
-        if conversation_id not in conversations:
-            raise HTTPException(status_code=404, detail="Conversation not found")
-        
         # Get conversation history
         history = conversations[conversation_id]
         
