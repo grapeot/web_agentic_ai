@@ -72,8 +72,17 @@ MOCK_HTML_CONTENT = """
 class TestWebSearch(unittest.TestCase):
     """Tests for the web search functionality."""
     
-    @patch('app.tools.web_tools.DDGS')
-    async def test_search_with_retry_success(self, mock_ddgs):
+    def setUp(self):
+        """Set up an event loop for each test."""
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+    
+    def tearDown(self):
+        """Clean up the event loop after each test."""
+        self.loop.close()
+    
+    @patch('duckduckgo_search.DDGS')
+    def test_search_with_retry_success(self, mock_ddgs):
         """Test successful search with retry."""
         # Setup the mock
         mock_instance = MagicMock()
@@ -81,14 +90,14 @@ class TestWebSearch(unittest.TestCase):
         mock_ddgs.return_value = mock_instance
         
         # Call the function
-        results = await search_with_retry("test query")
+        results = self.loop.run_until_complete(search_with_retry("test query"))
         
         # Assertions
         self.assertEqual(results, MOCK_SEARCH_RESULTS)
         mock_instance.__enter__.return_value.text.assert_called_once()
     
-    @patch('app.tools.web_tools.DDGS')
-    async def test_search_with_retry_no_results(self, mock_ddgs):
+    @patch('duckduckgo_search.DDGS')
+    def test_search_with_retry_no_results(self, mock_ddgs):
         """Test search with no results."""
         # Setup the mock
         mock_instance = MagicMock()
@@ -96,17 +105,17 @@ class TestWebSearch(unittest.TestCase):
         mock_ddgs.return_value = mock_instance
         
         # Call the function
-        results = await search_with_retry("test query")
+        results = self.loop.run_until_complete(search_with_retry("test query"))
         
         # Assertions
         self.assertEqual(results, [])
     
-    @patch('app.tools.web_tools.DDGS')
-    async def test_search_with_retry_error(self, mock_ddgs):
+    @patch('duckduckgo_search.DDGS')
+    def test_search_with_retry_error(self, mock_ddgs):
         """Test search with error and retry."""
         # Setup the mock to raise an exception on first call, then succeed
         mock_instance_fail = MagicMock()
-        mock_instance_fail.__enter__.return_value.text.side_effect = Exception("Test error")
+        mock_instance_fail.__enter__.return_value.text.side_effect = Exception("Test search error")
         
         mock_instance_success = MagicMock()
         mock_instance_success.__enter__.return_value.text.return_value = MOCK_SEARCH_RESULTS
@@ -114,8 +123,8 @@ class TestWebSearch(unittest.TestCase):
         mock_ddgs.side_effect = [mock_instance_fail, mock_instance_success]
         
         # Call the function with retry
-        with patch('app.tools.web_tools.asyncio.sleep', return_value=None) as mock_sleep:
-            results = await search_with_retry("test query", max_retries=2)
+        with patch('asyncio.sleep', return_value=None) as mock_sleep:
+            results = self.loop.run_until_complete(search_with_retry("test query", max_retries=2))
             
             # Assertions
             self.assertEqual(results, MOCK_SEARCH_RESULTS)
@@ -132,13 +141,13 @@ class TestWebSearch(unittest.TestCase):
         self.assertIn("This is the first example search result.", formatted)
     
     @patch('app.tools.web_tools.search_with_retry')
-    async def test_web_search_success(self, mock_search):
+    def test_web_search_success(self, mock_search):
         """Test web search with successful results."""
         # Setup mock
         mock_search.return_value = MOCK_SEARCH_RESULTS
         
         # Call function
-        result = await web_search("test query")
+        result = self.loop.run_until_complete(web_search("test query"))
         
         # Assertions
         self.assertEqual(result["status"], "success")
@@ -146,13 +155,13 @@ class TestWebSearch(unittest.TestCase):
         self.assertIn("formatted_results", result)
     
     @patch('app.tools.web_tools.search_with_retry')
-    async def test_web_search_empty(self, mock_search):
+    def test_web_search_empty(self, mock_search):
         """Test web search with no results."""
         # Setup mock
         mock_search.return_value = []
         
         # Call function
-        result = await web_search("test query")
+        result = self.loop.run_until_complete(web_search("test query"))
         
         # Assertions
         self.assertEqual(result["status"], "success")
@@ -160,36 +169,45 @@ class TestWebSearch(unittest.TestCase):
         self.assertIn("no results found", result["message"].lower())
     
     @patch('app.tools.web_tools.search_with_retry')
-    async def test_web_search_error(self, mock_search):
+    def test_web_search_error(self, mock_search):
         """Test web search with error."""
         # Setup mock
         mock_search.side_effect = Exception("Test search error")
         
         # Call function
-        result = await web_search("test query")
+        result = self.loop.run_until_complete(web_search("test query"))
         
         # Assertions
         self.assertEqual(result["status"], "error")
         self.assertIn("error", result["message"].lower())
     
-    @patch('app.tools.web_tools.web_search')
-    def test_search_wrapper(self, mock_web_search):
+    @patch('app.tools.web_tools.asyncio.run')
+    def test_search_wrapper(self, mock_asyncio_run):
         """Test the synchronous wrapper for web_search."""
         # Setup mock
         mock_result = {"status": "success", "results": MOCK_SEARCH_RESULTS}
-        mock_web_search.return_value = asyncio.Future()
-        mock_web_search.return_value.set_result(mock_result)
+        mock_asyncio_run.return_value = mock_result
         
         # Call function
         result = search("test query")
         
         # Assertions
         self.assertEqual(result, mock_result)
+        mock_asyncio_run.assert_called_once()
 
 
 # Tests for web content extraction functionality
 class TestWebContentExtraction(unittest.TestCase):
     """Tests for the web content extraction functionality."""
+    
+    def setUp(self):
+        """Set up an event loop for each test."""
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+    
+    def tearDown(self):
+        """Clean up the event loop after each test."""
+        self.loop.close()
     
     def test_validate_url_valid(self):
         """Test URL validation with valid URLs."""
@@ -228,7 +246,7 @@ class TestWebContentExtraction(unittest.TestCase):
         self.assertNotIn("color: black", result)
     
     @patch('app.tools.web_tools.process_urls')
-    async def test_extract_web_content_success(self, mock_process_urls):
+    def test_extract_web_content_success(self, mock_process_urls):
         """Test successful web content extraction."""
         # Setup mock
         urls = ["https://example.com"]
@@ -241,50 +259,50 @@ class TestWebContentExtraction(unittest.TestCase):
         ]
         
         # Call function
-        result = await extract_web_content(urls)
+        result = self.loop.run_until_complete(extract_web_content(urls))
         
         # Assertions
         self.assertEqual(result["status"], "success")
         self.assertIn("results", result)
         self.assertIn("formatted_results", result)
     
-    async def test_extract_web_content_invalid_urls(self):
+    def test_extract_web_content_invalid_urls(self):
         """Test web content extraction with invalid URLs."""
         # Call function with invalid URLs
-        result = await extract_web_content(["not-a-valid-url"])
+        result = self.loop.run_until_complete(extract_web_content(["not-a-valid-url"]))
         
         # Assertions
         self.assertEqual(result["status"], "error")
         self.assertIn("No valid URLs", result["message"])
     
     @patch('app.tools.web_tools.process_urls')
-    async def test_extract_web_content_error(self, mock_process_urls):
+    def test_extract_web_content_error(self, mock_process_urls):
         """Test web content extraction with processing error."""
         # Setup mock to raise exception
         urls = ["https://example.com"]
         mock_process_urls.side_effect = Exception("Test processing error")
         
         # Call function
-        result = await extract_web_content(urls)
+        result = self.loop.run_until_complete(extract_web_content(urls))
         
         # Assertions
         self.assertEqual(result["status"], "error")
         self.assertIn("error", result["message"].lower())
     
-    @patch('app.tools.web_tools.extract_web_content')
-    def test_extract_content_wrapper(self, mock_extract):
+    @patch('app.tools.web_tools.asyncio.run')
+    def test_extract_content_wrapper(self, mock_asyncio_run):
         """Test the synchronous wrapper for extract_web_content."""
         # Setup mock
         urls = ["https://example.com"]
         mock_result = {"status": "success", "results": [{"content": "test"}]}
-        mock_extract.return_value = asyncio.Future()
-        mock_extract.return_value.set_result(mock_result)
+        mock_asyncio_run.return_value = mock_result
         
         # Call function
         result = extract_content(urls)
         
         # Assertions
         self.assertEqual(result, mock_result)
+        mock_asyncio_run.assert_called_once()
 
 
 def run_tests():

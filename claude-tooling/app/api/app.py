@@ -101,34 +101,34 @@ class UserRequest(BaseModel):
     temperature: float = 0.7
     thinking_mode: bool = True
     thinking_budget_tokens: int = 2000
-    auto_execute_tools: bool = True  # 新参数，控制是否自动执行工具
+    auto_execute_tools: bool = True  # New parameter to control automatic tool execution
 
 # 添加新的自动工具执行函数
 async def auto_execute_tool_calls(tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    自动执行工具调用并返回结果。
+    Automatically execute tool calls and return results.
     """
     try:
-        logger.info(f"自动执行 {len(tool_calls)} 个工具调用")
+        logger.info(f"Automatically executing {len(tool_calls)} tool calls")
         
-        # 使用现有的process_tool_calls函数处理工具调用
-        # 由于process_tool_calls可能不是异步函数，需要确保正确处理
+        # Use the existing process_tool_calls function to handle tool calls
+        # Since process_tool_calls may not be an async function, ensure proper handling
         tool_results = process_tool_calls(tool_calls)
         
-        # 返回格式化后的工具结果
-        logger.info(f"工具执行完成，获得 {len(tool_results)} 个结果")
+        # Return formatted tool results
+        logger.info(f"Tool execution completed, {len(tool_results)} results obtained")
         return tool_results
     
     except Exception as e:
-        logger.error(f"自动执行工具调用时出错: {str(e)}")
-        # 返回错误结果
+        logger.error(f"Error executing tool calls: {str(e)}")
+        # Return error results
         error_results = []
         for tool_call in tool_calls:
             error_results.append({
                 "tool_use_id": tool_call.get("id"),
                 "content": json.dumps({
                     "status": "error",
-                    "message": f"自动执行工具调用时出错: {str(e)}"
+                    "message": f"Error executing tool calls: {str(e)}"
                 })
             })
         return error_results
@@ -266,9 +266,9 @@ async def chat(request: UserRequest, background_tasks: BackgroundTasks):
         
         # 如果启用了自动执行工具且有工具调用，自动处理并递归处理后续调用
         if request.auto_execute_tools and tool_calls:
-            logger.info("自动执行工具调用已启用，开始执行工具任务")
+            logger.info("Automatic tool execution enabled, starting tool task")
             
-            # 创建一个后台任务处理工具调用并继续对话
+            # Create a background task to handle tool calls and continue conversation
             background_tasks.add_task(process_tool_calls_and_continue, tool_calls, conversation_id, request.max_tokens, request.thinking_mode, request.thinking_budget_tokens, request.auto_execute_tools)
         
         # Prepare the response
@@ -293,57 +293,57 @@ async def process_tool_calls_and_continue(
     auto_execute_tools: bool
 ):
     """
-    处理工具调用，获取结果，并继续与Claude的对话，直到完成所有工具调用。
+    Process tool calls, get results, and continue conversation with Claude until all tool calls are completed.
     """
     try:
         if not tool_calls:
-            logger.info("没有工具调用需要处理")
+            logger.info("No tool calls to process")
             return
             
-        # 获取会话历史
+        # Get conversation history
         if conversation_id not in conversations:
-            logger.error(f"找不到对话ID: {conversation_id}")
+            logger.error(f"Conversation ID not found: {conversation_id}")
             return
         
-        # 初始化或检查任务状态
+        # Initialize or check task status
         if conversation_id not in auto_execute_tasks:
             auto_execute_tasks[conversation_id] = "running"
         
-        # 检查是否被取消
+        # Check if cancelled
         if auto_execute_tasks.get(conversation_id) == "cancelled":
-            logger.info(f"会话 {conversation_id} 的自动执行已被取消")
+            logger.info(f"Automatic execution of conversation {conversation_id} cancelled")
             return
             
         history = conversations[conversation_id]
         
-        # 自动执行工具调用并获取结果
+        # Automatically execute tool calls and get results
         try:
             tool_results = await auto_execute_tool_calls(tool_calls)
         except Exception as e:
-            logger.error(f"执行工具调用时出错: {str(e)}")
-            # 添加错误消息到历史记录
+            logger.error(f"Error executing tool calls: {str(e)}")
+            # Add error message to history
             history.append({
                 "role": "system",
-                "content": [{"type": "text", "text": f"执行工具调用时出错: {str(e)}"}]
+                "content": [{"type": "text", "text": f"Error executing tool calls: {str(e)}"}]
             })
             auto_execute_tasks[conversation_id] = "error"
             return
         
-        # 检查是否被取消
+        # Check if cancelled
         if auto_execute_tasks.get(conversation_id) == "cancelled":
-            logger.info(f"会话 {conversation_id} 的自动执行已被取消")
+            logger.info(f"Automatic execution of conversation {conversation_id} cancelled")
             return
         
-        # 将工具结果格式化为Claude API期望的格式
+        # Format tool results as expected by Claude API
         tool_result_blocks = format_tool_results_for_claude(tool_results)
         
-        # 添加工具结果到会话历史
+        # Add tool results to conversation history
         history.append({
             "role": "user",
             "content": tool_result_blocks
         })
         
-        # 准备thinking参数
+        # Prepare thinking parameter
         thinking_param = None
         temperature_param = 0.7
         if thinking_mode:
@@ -353,13 +353,13 @@ async def process_tool_calls_and_continue(
             }
             temperature_param = 1.0
         
-        # 检查是否被取消
+        # Check if cancelled
         if auto_execute_tasks.get(conversation_id) == "cancelled":
-            logger.info(f"会话 {conversation_id} 的自动执行已被取消")
+            logger.info(f"Automatic execution of conversation {conversation_id} cancelled")
             return
             
-        # 调用Claude API继续对话
-        logger.info(f"继续与Claude对话，会话ID: {conversation_id}")
+        # Call Claude API to continue conversation
+        logger.info(f"Continuing conversation with Claude, conversation ID: {conversation_id}")
         try:
             response = client.messages.create(
                 model="claude-3-7-sonnet-20250219",
@@ -377,25 +377,25 @@ async def process_tool_calls_and_continue(
                 thinking=thinking_param,
             )
         except Exception as e:
-            logger.error(f"调用Claude API时出错: {str(e)}")
-            # 添加错误消息到历史记录
+            logger.error(f"Error calling Claude API: {str(e)}")
+            # Add error message to history
             history.append({
                 "role": "system",
-                "content": [{"type": "text", "text": f"调用Claude API时出错: {str(e)}"}]
+                "content": [{"type": "text", "text": f"Error calling Claude API: {str(e)}"}]
             })
             auto_execute_tasks[conversation_id] = "error"
             return
         
-        # 处理响应
+        # Process response
         try:
-            # 提取响应内容
+            # Extract response content
             if hasattr(response, 'model_dump'):
                 response_dict = response.model_dump()
                 raw_content = response_dict.get('content', [])
             else:
                 raw_content = response.content
                 
-            # 转换内容项为字典
+            # Convert content items to dictionaries
             content = []
             for item in raw_content:
                 if hasattr(item, 'model_dump'):
@@ -405,15 +405,15 @@ async def process_tool_calls_and_continue(
                 else:
                     content.append(dict(item))
                     
-            # 添加助手响应到会话历史
+            # Add assistant response to conversation history
             history.append({"role": "assistant", "content": content})
             
-            # 检查是否被取消
+            # Check if cancelled
             if auto_execute_tasks.get(conversation_id) == "cancelled":
-                logger.info(f"会话 {conversation_id} 的自动执行已被取消")
+                logger.info(f"Automatic execution of conversation {conversation_id} cancelled")
                 return
                 
-            # 提取新的工具调用
+            # Extract new tool calls
             new_tool_calls = []
             for item in content:
                 if item.get('type') == 'tool_use':
@@ -423,9 +423,9 @@ async def process_tool_calls_and_continue(
                         "input": item.get('input', {})
                     })
                     
-            # 如果有新的工具调用且启用了自动执行，递归处理
+            # If there are new tool calls and automatic execution is enabled, recursively process
             if auto_execute_tools and new_tool_calls:
-                logger.info(f"发现{len(new_tool_calls)}个新的工具调用，继续处理")
+                logger.info(f"Found {len(new_tool_calls)} new tool calls, continuing processing")
                 await process_tool_calls_and_continue(
                     new_tool_calls, 
                     conversation_id, 
@@ -436,25 +436,25 @@ async def process_tool_calls_and_continue(
                 )
                 
         except Exception as e:
-            logger.error(f"处理Claude响应时出错: {str(e)}")
-            # 添加错误消息到历史记录
+            logger.error(f"Error processing Claude response: {str(e)}")
+            # Add error message to history
             history.append({
                 "role": "system",
-                "content": [{"type": "text", "text": f"处理Claude响应时出错: {str(e)}"}]
+                "content": [{"type": "text", "text": f"Error processing Claude response: {str(e)}"}]
             })
             auto_execute_tasks[conversation_id] = "error"
             
     except Exception as e:
-        logger.error(f"处理工具调用和继续对话时出错: {str(e)}")
-        # 添加错误消息到会话历史
+        logger.error(f"Error processing tool calls and continuing conversation: {str(e)}")
+        # Add error message to conversation history
         if conversation_id in conversations:
             conversations[conversation_id].append({
                 "role": "system",
-                "content": [{"type": "text", "text": f"处理工具调用和继续对话时出错: {str(e)}"}]
+                "content": [{"type": "text", "text": f"Error processing tool calls and continuing conversation: {str(e)}"}]
             })
         auto_execute_tasks[conversation_id] = "error"
     finally:
-        # 任务完成后清理状态
+        # Clean up state after task completion
         if conversation_id in auto_execute_tasks and auto_execute_tasks[conversation_id] not in ["cancelled", "error"]:
             auto_execute_tasks[conversation_id] = "completed"
 
@@ -561,11 +561,11 @@ async def submit_tool_results(
         # Add assistant response to conversation history
         history.append({"role": "assistant", "content": content})
         
-        # 如果启用了自动执行工具且有工具调用，启动后台任务处理
+        # If automatic execution is enabled and there are tool calls, start background task to handle
         if auto_execute_tools and tool_calls:
-            logger.info("自动执行工具调用已启用，开始执行工具任务")
+            logger.info("Automatic tool execution enabled, starting tool task")
             
-            # 创建一个后台任务处理工具调用并继续对话
+            # Create a background task to handle tool calls and continue conversation
             background_tasks.add_task(
                 process_tool_calls_and_continue, 
                 tool_calls, 
@@ -607,25 +607,25 @@ app.mount("/frontend", StaticFiles(directory=os.path.join(os.path.dirname(os.pat
 @app.get("/api/conversation/{conversation_id}/messages")
 async def get_conversation_messages(conversation_id: str):
     """
-    获取指定会话的消息历史。
-    用于前端轮询获取自动工具执行的结果和新助手响应。
+    Get message history for a specific conversation.
+    Used for front-end polling to get results of automatic tool execution and new assistant responses.
     """
     try:
-        logger.info(f"获取会话 {conversation_id} 的消息")
+        logger.info(f"Getting messages for conversation {conversation_id}")
         
         if conversation_id not in conversations:
-            raise HTTPException(status_code=404, detail="会话不存在")
+            raise HTTPException(status_code=404, detail="Conversation not found")
         
-        # 获取会话历史
+        # Get conversation history
         history = conversations[conversation_id]
         
-        # 判断会话状态
-        # 查找最后一条消息，如果是助手消息且没有工具调用，则认为会话已完成
+        # Check conversation status
+        # Find the last message, if it's assistant message and no tool calls, then consider conversation completed
         status = "in_progress"
         if history and len(history) > 0:
             last_message = history[-1]
             if last_message["role"] == "assistant":
-                # 检查是否有工具调用
+                # Check if there are tool calls
                 has_tool_call = False
                 for item in last_message["content"]:
                     if isinstance(item, dict) and item.get("type") == "tool_use":
@@ -642,36 +642,36 @@ async def get_conversation_messages(conversation_id: str):
         }
         
     except Exception as e:
-        logger.error(f"获取会话消息时出错: {str(e)}")
+        logger.error(f"Error getting conversation messages: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # 添加一个新的端点用于取消自动工具执行
 @app.post("/api/conversation/{conversation_id}/cancel")
 async def cancel_auto_execution(conversation_id: str):
     """
-    取消正在进行的自动工具执行。
-    允许用户中断长时间运行的自动工具执行过程。
+    Cancel ongoing automatic tool execution.
+    Allows user to interrupt long-running automatic tool execution process.
     """
     try:
-        logger.info(f"收到取消自动执行的请求，会话ID: {conversation_id}")
+        logger.info(f"Received cancel automatic execution request, conversation ID: {conversation_id}")
         
         if conversation_id not in conversations:
-            raise HTTPException(status_code=404, detail="会话不存在")
+            raise HTTPException(status_code=404, detail="Conversation not found")
         
-        # 标记该会话的自动执行任务为已取消
+        # Mark automatic execution task for this conversation as cancelled
         auto_execute_tasks[conversation_id] = "cancelled"
         
-        # 添加系统消息到会话历史
+        # Add system message to conversation history
         if conversation_id in conversations:
             conversations[conversation_id].append({
                 "role": "system", 
-                "content": [{"type": "text", "text": "自动工具执行已被用户取消"}]
+                "content": [{"type": "text", "text": "Automatic tool execution cancelled by user"}]
             })
         
-        return {"status": "success", "message": "自动工具执行已取消"}
+        return {"status": "success", "message": "Automatic tool execution cancelled"}
         
     except Exception as e:
-        logger.error(f"取消自动执行时出错: {str(e)}")
+        logger.error(f"Error cancelling automatic execution: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
