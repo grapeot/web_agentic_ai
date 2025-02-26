@@ -9,6 +9,8 @@ import sys
 import json
 import logging
 from typing import Dict, Any
+import asyncio
+from unittest.mock import patch
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -27,6 +29,7 @@ if parent_dir not in sys.path:
 # Import the tools
 from app.tools.file_tools import save_file, read_file
 from app.tools.command_tools import run_command, install_python_package
+from app.tools.web_tools import search, extract_content
 from app.tools.tool_wrapper import process_tool_calls, format_tool_results_for_claude, TOOL_DEFINITIONS
 
 def test_save_file():
@@ -112,6 +115,94 @@ def test_tool_wrapper():
         "claude_format": claude_format
     }
 
+def test_web_search():
+    """Test the web search functionality with a mocked response."""
+    logger.info("Testing web search function...")
+    
+    try:
+        # Use a simple query that should work with mocked response
+        query = "test query"
+        
+        # Patch the search function to avoid actual network calls
+        with patch('app.tools.web_tools.search_with_retry') as mock_search:
+            # Set up mock return value
+            mock_results = [
+                {
+                    "href": "https://example.com/result1",
+                    "title": "Test Result 1",
+                    "body": "This is a test search result."
+                }
+            ]
+            # Create a future for the async function
+            future = asyncio.Future()
+            future.set_result(mock_results)
+            mock_search.return_value = future
+            
+            # Use asyncio to run the search function
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+            result = loop.run_until_complete(search(query))
+            
+            if result["status"] == "success" and "results" in result:
+                logger.info("web_search test passed!")
+            else:
+                logger.error(f"web_search test failed: {result}")
+                
+            return result
+    except Exception as e:
+        logger.error(f"web_search test failed with exception: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Exception: {str(e)}"
+        }
+
+def test_extract_content():
+    """Test the web content extraction functionality with a mocked response."""
+    logger.info("Testing web content extraction function...")
+    
+    try:
+        # Use a simple URL for testing
+        urls = ["https://example.com"]
+        
+        # Patch the extract function to avoid actual network calls
+        with patch('app.tools.web_tools.process_urls') as mock_process:
+            # Set up mock return value
+            mock_results = [
+                {
+                    "url": "https://example.com",
+                    "status": "success",
+                    "content": "This is extracted content from the test page."
+                }
+            ]
+            # Create a future for the async function
+            future = asyncio.Future()
+            future.set_result(mock_results)
+            mock_process.return_value = future
+            
+            # Use asyncio to run the extract function
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+            result = loop.run_until_complete(extract_content(urls))
+            
+            if result["status"] == "success" and "results" in result:
+                logger.info("extract_content test passed!")
+            else:
+                logger.error(f"extract_content test failed: {result}")
+                
+            return result
+    except Exception as e:
+        logger.error(f"extract_content test failed with exception: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Exception: {str(e)}"
+        }
+
 def run_all_tests():
     """Run all tests and report results."""
     logger.info("Starting tool module tests...")
@@ -124,7 +215,9 @@ def run_all_tests():
         "save_file": test_save_file(),
         "read_file": test_read_file(),
         "run_command": test_run_command(),
-        "tool_wrapper": test_tool_wrapper()
+        "tool_wrapper": test_tool_wrapper(),
+        "web_search": test_web_search(),
+        "extract_content": test_extract_content()
     }
     
     # Print summary

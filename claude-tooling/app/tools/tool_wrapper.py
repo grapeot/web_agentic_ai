@@ -3,6 +3,7 @@ import logging
 from typing import List, Dict, Any, Callable, Optional, Union
 from .file_tools import save_file, read_file
 from .command_tools import run_command, install_python_package
+from .web_tools import search, extract_content
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,49 @@ TOOL_DEFINITIONS = [
             },
             "required": ["package_name"]
         }
+    },
+    {
+        "name": "web_search",
+        "description": "Search the web using DuckDuckGo and return results with URLs and text snippets.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The search query"
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "Maximum number of results to return (optional, default: 10)"
+                },
+                "max_retries": {
+                    "type": "integer",
+                    "description": "Maximum number of retry attempts (optional, default: 3)"
+                }
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "extract_web_content",
+        "description": "Extract text content from web pages and return it in a readable format with hyperlinks preserved as markdown.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "urls": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "List of URLs to process"
+                },
+                "max_concurrent": {
+                    "type": "integer",
+                    "description": "Maximum number of concurrent browser instances (optional, default: 3)"
+                }
+            },
+            "required": ["urls"]
+        }
     }
 ]
 
@@ -83,7 +127,9 @@ TOOL_FUNCTIONS = {
     "save_file": save_file,
     "read_file": read_file,
     "run_terminal_command": run_command,
-    "install_python_package": install_python_package
+    "install_python_package": install_python_package,
+    "web_search": search,
+    "extract_web_content": extract_content
 }
 
 def process_tool_calls(tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
