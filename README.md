@@ -174,6 +174,56 @@ This project uses `.cursorrules` to configure the AI assistant. The assistant ca
 - Perform web searches
 - Analyze images and code
 
+## GitHub Workflows
+
+This project uses GitHub Actions to automatically run tests on Pull Requests and after merges to the main branch.
+
+### CI Workflow
+
+The continuous integration workflow runs all unit tests to ensure code quality:
+
+```yaml
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f claude-tooling/requirements.txt ]; then pip install -r claude-tooling/requirements.txt; fi
+          playwright install chromium
+      - name: Run tests
+        run: |
+          python -m unittest discover claude-tooling/tests
+```
+
+To implement this workflow:
+
+1. Create the `.github/workflows` directory in your repository
+2. Add the `ci.yml` file with the content above
+3. Commit and push to your repository
+
+The workflow will automatically run tests when:
+- A new PR is created or updated
+- Code is merged into the main/master branch
+
+You can view workflow results in the "Actions" tab of your GitHub repository.
+
 ## License
 
 MIT License
