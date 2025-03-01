@@ -10,7 +10,7 @@ import * as tools from './tools.js';
  * 设置所有事件监听
  * @param {Object} elements - DOM元素引用
  */
-export function setupEventListeners(elements) {
+function setupEventListeners(elements) {
   // 设置滑块事件
   setupSliderEvents(elements);
   
@@ -22,47 +22,74 @@ export function setupEventListeners(elements) {
 }
 
 /**
- * 设置滑块相关事件
+ * 设置滑块和值显示的实时更新
  * @param {Object} elements - DOM元素引用
  * @private
  */
 function setupSliderEvents(elements) {
   // 温度滑块
-  elements.temperatureSlider.addEventListener('input', function() {
-    elements.tempValue.textContent = this.value;
-    state.updateSetting('temperature', parseFloat(this.value));
-  });
+  if (elements.temperatureSlider && elements.tempValue) {
+    elements.temperatureSlider.addEventListener('input', function() {
+      const value = this.value;
+      elements.tempValue.textContent = value;
+      state.updateSetting('temperature', parseFloat(value));
+    });
+  }
   
-  // 最大令牌滑块
-  elements.maxTokensSlider.addEventListener('input', function() {
-    elements.tokensValue.textContent = this.value;
-    state.updateSetting('maxTokens', parseInt(this.value));
-  });
+  // 最大令牌数滑块
+  if (elements.maxTokensSlider && elements.tokensValue) {
+    elements.maxTokensSlider.addEventListener('input', function() {
+      const value = this.value;
+      elements.tokensValue.textContent = value;
+      state.updateSetting('maxTokens', parseInt(value, 10));
+    });
+  }
   
   // 思考预算滑块
-  elements.thinkingBudgetSlider.addEventListener('input', function() {
-    elements.budgetValue.textContent = this.value;
-    state.updateSetting('thinkingBudget', parseInt(this.value));
-  });
+  if (elements.thinkingBudgetSlider && elements.budgetValue) {
+    elements.thinkingBudgetSlider.addEventListener('input', function() {
+      const value = this.value;
+      elements.budgetValue.textContent = value;
+      state.updateSetting('thinkingBudget', parseInt(value, 10));
+    });
+  }
 }
 
 /**
- * 设置按钮相关事件
+ * 设置按钮点击事件
  * @param {Object} elements - DOM元素引用
  * @private
  */
 function setupButtonEvents(elements) {
   // 发送按钮
-  elements.sendButton.addEventListener('click', handleSendMessage);
+  if (elements.sendButton) {
+    elements.sendButton.addEventListener('click', handleSendMessage);
+  }
   
-  // 清空聊天按钮
-  elements.clearChatButton.addEventListener('click', handleClearChat);
+  // 用户输入回车发送
+  if (elements.userInput) {
+    elements.userInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSendMessage();
+      }
+    });
+  }
+  
+  // 清除聊天按钮
+  if (elements.clearChatButton) {
+    elements.clearChatButton.addEventListener('click', handleClearChat);
+  }
   
   // 提交工具结果按钮
-  elements.submitToolResultButton.addEventListener('click', handleSubmitToolResult);
+  if (elements.submitToolResultButton) {
+    elements.submitToolResultButton.addEventListener('click', handleSubmitToolResult);
+  }
   
   // 取消自动执行按钮
-  elements.cancelAutoExecutionButton.addEventListener('click', handleCancelAutoExecution);
+  if (elements.cancelAutoExecutionButton) {
+    elements.cancelAutoExecutionButton.addEventListener('click', handleCancelAutoExecution);
+  }
 }
 
 /**
@@ -71,236 +98,263 @@ function setupButtonEvents(elements) {
  * @private
  */
 function setupOtherEvents(elements) {
-  // 用户输入框按键事件
-  elements.userInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  });
-  
   // 思考模式开关
-  elements.thinkingModeSwitch.addEventListener('change', function() {
-    state.updateSetting('thinkingMode', this.checked);
-  });
+  if (elements.thinkingModeSwitch) {
+    elements.thinkingModeSwitch.addEventListener('change', function() {
+      state.updateSetting('thinkingMode', this.checked);
+      
+      // 更新思考预算滑块的可用状态
+      if (elements.thinkingBudgetSlider) {
+        elements.thinkingBudgetSlider.disabled = !this.checked;
+      }
+    });
+  }
   
   // 自动执行工具开关
-  elements.autoExecuteToolsSwitch.addEventListener('change', function() {
-    state.updateSetting('autoExecuteTools', this.checked);
-  });
+  if (elements.autoExecuteToolsSwitch) {
+    elements.autoExecuteToolsSwitch.addEventListener('change', function() {
+      state.updateSetting('autoExecuteTools', this.checked);
+    });
+  }
   
-  // 聊天界面事件委托（用于折叠/展开工具调用）
-  elements.chatMessages.addEventListener('click', handleChatMessageClicks);
-}
-
-/**
- * 处理发送消息
- */
-export async function handleSendMessage() {
-  const userInput = ui.getElements().userInput;
-  const message = userInput.value.trim();
-  if (!message) return;
-  
-  // 添加用户消息到界面
-  ui.addMessageToChat(ROLES.USER, message);
-  userInput.value = '';
-  
-  // 构建用于API的消息
-  const userMessage = {
-    role: 'user',
-    content: [{
-      type: 'text',
-      text: message
-    }]
-  };
-  state.addMessage(userMessage);
-  
-  // 显示加载指示器
-  ui.setLoading(true);
-  
-  try {
-    // 发送消息到API
-    const apiResponse = await api.sendMessage(
-      state.getMessages(),
-      state.getSettings(),
-      state.getConversationId()
-    );
-    
-    ui.setLoading(false);
-    
-    // 处理响应
-    if (apiResponse.conversation_id) {
-      state.setConversationId(apiResponse.conversation_id);
-    }
-    
-    // 显示思考过程（如果有）
-    if (apiResponse.thinking) {
-      ui.addThinkingToChat(apiResponse.thinking);
-    }
-    
-    // 处理助手回复
-    if (apiResponse.message && apiResponse.message.content) {
-      tools.processAssistantMessage(apiResponse.message.content);
-    } else {
-      console.error('响应缺少消息字段:', apiResponse);
-      ui.addMessageToChat('assistant', '错误：无法从Claude获取有效回复。请重试。');
-    }
-    
-    // 处理工具调用
-    if (apiResponse.tool_calls && apiResponse.tool_calls.length > 0) {
-      const toolCall = apiResponse.tool_calls[0];
-      ui.addToolCallToChat(toolCall);
-      
-      state.setCurrentToolUseId(toolCall.id);
-      
-      if (state.getSettings().autoExecuteTools) {
-        console.log("在初始响应中找到工具调用，且启用了自动执行，开始轮询更新");
-        state.setAutoExecutingTools(true);
-        state.setWaitingForToolResult(false);
-        tools.startPollingForUpdates();
-      } else {
-        state.setWaitingForToolResult(true);
-        ui.showToolResultModal();
-      }
-    } else if (state.getSettings().autoExecuteTools) {
-      console.log("没有立即的工具调用，但启用了自动执行 - 开始轮询");
-      state.setAutoExecutingTools(true);
-      tools.startPollingForUpdates();
-    }
-  } catch (error) {
-    ui.setLoading(false);
-    console.error('发送消息错误:', error);
+  // 聊天消息点击处理（用于交互式元素）
+  if (elements.chatMessages) {
+    elements.chatMessages.addEventListener('click', handleChatMessageClicks);
   }
 }
 
 /**
- * 处理清除聊天
+ * 处理发送消息按钮点击
  */
-export function handleClearChat() {
+async function handleSendMessage() {
+  const elements = ui.getElements();
+  
+  // 检查是否正在等待工具结果
+  if (state.isWaitingForToolResult()) {
+    alert('请先提交当前工具结果');
+    return;
+  }
+  
+  const userInput = elements.userInput;
+  if (!userInput || !userInput.value.trim()) return;
+  
+  const userMessage = userInput.value.trim();
+  userInput.value = '';
+  
+  // 添加用户消息到聊天
+  ui.addMessageToChat('user', userMessage);
+  
+  // 设置加载状态
+  ui.setLoading(true);
+  
+  try {
+    // 准备消息
+    const messages = state.getMessages();
+    messages.push({
+      role: 'user',
+      content: [{
+        type: 'text',
+        text: userMessage
+      }]
+    });
+    
+    // 添加到状态
+    state.addMessage(messages[messages.length - 1]);
+    
+    // 发送API请求
+    const response = await api.sendMessage(
+      messages,
+      state.getSettings(),
+      state.getConversationId()
+    );
+    
+    // 设置对话ID
+    if (response.conversation_id) {
+      state.setConversationId(response.conversation_id);
+    }
+    
+    // 处理助手响应
+    if (response.message) {
+      // 添加到状态
+      state.addMessage(response.message);
+      
+      // 处理消息内容
+      tools.processAssistantMessage(response.message.content);
+      
+      // 检查思考模式
+      if (response.thinking && state.getSettings().thinkingMode) {
+        ui.addThinkingToChat(response.thinking);
+      }
+    }
+    
+    // 检查是否有工具调用
+    if (response.tool_calls && response.tool_calls.length > 0) {
+      // 是否应该自动执行
+      const autoExecute = state.getSettings().autoExecuteTools;
+      
+      if (autoExecute) {
+        // 开始轮询更新
+        tools.startPollingForUpdates();
+      }
+    }
+  } catch (error) {
+    console.error('Error sending message:', error);
+    ui.addMessageToChat('system', `Error: ${error.message}`);
+  } finally {
+    ui.setLoading(false);
+  }
+}
+
+/**
+ * 处理清除聊天按钮点击
+ */
+function handleClearChat() {
+  // 清除UI
   ui.clearChat();
+  
+  // 清除状态
   state.reset();
   
-  // 如果有轮询，清除它
+  // 停止任何进行中的轮询
   const pollingInterval = state.getPollingInterval();
   if (pollingInterval) {
     clearInterval(pollingInterval);
     state.setPollingInterval(null);
   }
   
+  // 隐藏自动执行指示器
   ui.setAutoExecutionIndicator(false);
-  console.log("聊天已清除，所有状态已重置");
 }
 
 /**
- * 处理提交工具结果
+ * 处理工具结果提交
  */
-export async function handleSubmitToolResult() {
-  const toolResult = ui.getElements().toolResultTextarea.value;
+async function handleSubmitToolResult() {
+  const elements = ui.getElements();
   const toolUseId = state.getCurrentToolUseId();
   
-  if (toolResult && toolUseId) {
-    ui.addToolResultToChat(toolResult, toolUseId);
+  if (!toolUseId || !elements.toolResult) {
+    return;
+  }
+  
+  let result = elements.toolResult.value.trim();
+  if (!result) {
+    alert('请提供工具结果');
+    return;
+  }
+  
+  // 尝试解析JSON
+  try {
+    JSON.parse(result);
+  } catch (e) {
+    // 如果不是有效的JSON，警告用户
+    if (!confirm('结果不是有效的JSON。确定要继续吗？')) {
+      return;
+    }
+  }
+  
+  // 设置加载状态
+  ui.setLoading(true);
+  
+  try {
+    // 提交工具结果
+    const response = await api.submitToolResult(
+      toolUseId,
+      result,
+      state.getConversationId(),
+      state.getSettings().autoExecuteTools
+    );
+    
+    // 添加工具结果到聊天
+    ui.addToolResultToChat(result, toolUseId);
+    
+    // 重置当前工具ID
+    state.setCurrentToolUseId(null);
+    state.setWaitingForToolResult(false);
+    
+    // 隐藏结果输入框
     ui.hideToolResultModal();
     
-    // 提交工具结果
-    ui.setLoading(true);
-    
-    try {
-      const response = await api.submitToolResult(
-        toolUseId,
-        toolResult,
-        state.getConversationId(),
-        state.getSettings().autoExecuteTools
-      );
+    // 处理API响应
+    if (response.message) {
+      // 添加到状态
+      state.addMessage(response.message);
       
-      ui.setLoading(false);
-      
+      // 处理消息内容
       tools.processAssistantMessage(response.message.content);
-      
-      // 检查新的工具调用
-      if (response.tool_calls && response.tool_calls.length > 0) {
-        state.setWaitingForToolResult(true);
-        const toolCall = response.tool_calls[0];
-        ui.addToolCallToChat(toolCall);
-        
-        state.setCurrentToolUseId(toolCall.id);
-        
-        if (state.getSettings().autoExecuteTools) {
-          console.log("工具结果后发现工具调用，继续轮询");
-          state.setAutoExecutingTools(true);
-          state.setWaitingForToolResult(false);
-          tools.startPollingForUpdates();
-        } else {
-          state.setWaitingForToolResult(true);
-          ui.showToolResultModal();
-        }
-      } else {
-        state.setWaitingForToolResult(false);
-        if (state.getSettings().autoExecuteTools) {
-          console.log("工具结果后没有立即的工具调用，确保轮询继续");
-          state.setAutoExecutingTools(true);
-          tools.startPollingForUpdates();
-        }
-      }
-    } catch (error) {
-      ui.setLoading(false);
-      console.error('提交工具结果错误:', error);
     }
+  } catch (error) {
+    console.error('Error submitting tool result:', error);
+    ui.addMessageToChat('system', `Error: ${error.message}`);
+  } finally {
+    ui.setLoading(false);
   }
 }
 
 /**
  * 处理取消自动执行
  */
-export function handleCancelAutoExecution() {
-  if (state.isAutoExecutingTools()) {
-    state.setAutoExecutingTools(false);
-    
-    const pollingInterval = state.getPollingInterval();
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-      state.setPollingInterval(null);
-    }
-    
-    ui.setAutoExecutionIndicator(false);
-    ui.addMessageToChat('system', '自动工具执行已取消');
+function handleCancelAutoExecution() {
+  // 停止轮询
+  const pollingInterval = state.getPollingInterval();
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    state.setPollingInterval(null);
   }
+  
+  // 更新状态
+  state.setAutoExecutingTools(false);
+  
+  // 隐藏指示器
+  ui.setAutoExecutionIndicator(false);
+  
+  console.log('自动执行已取消');
 }
 
 /**
- * 处理聊天消息区域点击事件（工具折叠/展开等）
- * @param {Event} e - 点击事件
+ * 处理聊天消息区域内的点击
+ * @param {Event} e - 点击事件对象
  */
-export function handleChatMessageClicks(e) {
-  // 查找最近的工具调用头部元素
-  const toolHeader = e.target.closest('.tool-call-header');
-  if (toolHeader) {
-    const toolCall = toolHeader.closest('.tool-call');
-    if (toolCall) {
-      const toolContent = toolCall.querySelector('.tool-content');
-      if (toolContent) {
-        // 切换展开/折叠状态
-        toolContent.classList.toggle('collapsed');
-        
-        // 更新箭头图标
-        const arrow = toolHeader.querySelector('.toggle-arrow');
-        if (arrow) {
-          if (toolContent.classList.contains('collapsed')) {
-            arrow.innerHTML = TOOL_DISPLAY.COLLAPSE_ARROW; // 右箭头（展开）
-          } else {
-            arrow.innerHTML = TOOL_DISPLAY.EXPAND_ARROW; // 下箭头（折叠）
-          }
-        }
+function handleChatMessageClicks(e) {
+  const target = e.target;
+  
+  // 处理工具调用折叠/展开
+  if (target.closest('.tool-call-header')) {
+    const header = target.closest('.tool-call-header');
+    const content = header.nextElementSibling;
+    
+    if (content && content.classList.contains('tool-call-content')) {
+      const isCollapsed = content.style.display === 'none';
+      content.style.display = isCollapsed ? 'block' : 'none';
+      
+      const toggleIcon = header.querySelector('.tool-call-toggle');
+      if (toggleIcon) {
+        toggleIcon.textContent = isCollapsed ? '▼' : '►';
       }
     }
   }
   
-  // 处理文件结果中的JSON详情切换
-  const jsonToggle = e.target.closest('.toggle-json-details');
-  if (jsonToggle) {
-    const jsonDetails = jsonToggle.closest('.file-result').querySelector('.file-json-details');
-    if (jsonDetails) {
-      jsonDetails.classList.toggle('collapsed');
+  // 处理执行工具按钮
+  if (target.closest('.execute-tool-button')) {
+    const button = target.closest('.execute-tool-button');
+    const toolUseId = button.dataset.toolUseId;
+    
+    if (toolUseId) {
+      // 显示工具结果输入框
+      ui.showToolResultModal();
+      
+      // 设置当前工具ID
+      state.setCurrentToolUseId(toolUseId);
+      state.setWaitingForToolResult(true);
     }
   }
-} 
+}
+
+export {
+  setupEventListeners,
+  handleSendMessage,
+  handleClearChat,
+  handleSubmitToolResult,
+  handleCancelAutoExecution,
+  handleChatMessageClicks
+}; 

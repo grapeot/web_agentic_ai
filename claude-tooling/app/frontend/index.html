@@ -133,6 +133,24 @@
     <!-- Highlight.js for syntax highlighting -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
     <!-- Custom JS -->
-    <script src="js/main.js"></script>
+    <script src="js/main.js" type="module"></script>
+    
+    <!-- Initialize Modal -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize Bootstrap modal
+            const toolResultModal = new bootstrap.Modal(document.getElementById('toolResultModal'));
+            
+            // Toggle settings panel
+            const toggleSettings = document.getElementById('toggle-settings');
+            const settingsPanel = document.getElementById('settings-panel');
+            
+            if (toggleSettings && settingsPanel) {
+                toggleSettings.addEventListener('click', function() {
+                    settingsPanel.classList.toggle('active');
+                });
+            }
+        });
+    </script>
 </body>
 </html> 

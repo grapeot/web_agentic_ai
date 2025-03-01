@@ -1,15 +1,15 @@
 /**
  * API模块 - 封装所有API交互
  */
-import { API_URL } from './config.js';
+import * as config from './config.js';
 
 /**
  * 获取可用工具列表
  * @returns {Promise<Object>} 包含工具列表的响应
  */
-export async function fetchAvailableTools() {
+async function fetchAvailableTools() {
   try {
-    const response = await fetch(`${API_URL}/api/tools`);
+    const response = await fetch(`${config.API_URL}/api/tools`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -27,7 +27,7 @@ export async function fetchAvailableTools() {
  * @param {string} [conversationId] - 对话ID（如果继续对话）
  * @returns {Promise<Object>} 聊天响应
  */
-export async function sendMessage(messages, settings, conversationId = null) {
+async function sendMessage(messages, settings, conversationId = null) {
   const requestBody = {
     messages,
     temperature: settings.temperature,
@@ -38,7 +38,7 @@ export async function sendMessage(messages, settings, conversationId = null) {
   };
   
   // 构建API端点
-  let apiEndpoint = `${API_URL}/api/chat`;
+  let apiEndpoint = `${config.API_URL}/api/chat`;
   
   // 如果存在对话ID，添加为URL参数
   if (conversationId) {
@@ -73,7 +73,7 @@ export async function sendMessage(messages, settings, conversationId = null) {
  * @param {boolean} autoExecuteTools - 是否自动执行工具
  * @returns {Promise<Object>} 响应数据
  */
-export async function submitToolResult(toolUseId, result, conversationId, autoExecuteTools) {
+async function submitToolResult(toolUseId, result, conversationId, autoExecuteTools) {
   const requestBody = {
     tool_use_id: toolUseId,
     content: result
@@ -81,7 +81,7 @@ export async function submitToolResult(toolUseId, result, conversationId, autoEx
   
   try {
     const response = await fetch(
-      `${API_URL}/api/tool-results?conversation_id=${conversationId}&auto_execute_tools=${autoExecuteTools}`, 
+      `${config.API_URL}/api/tool-results?conversation_id=${conversationId}&auto_execute_tools=${autoExecuteTools}`, 
       {
         method: 'POST',
         headers: {
@@ -107,9 +107,9 @@ export async function submitToolResult(toolUseId, result, conversationId, autoEx
  * @param {string} conversationId - 对话ID
  * @returns {Promise<Object>} 更新的消息
  */
-export async function getConversationUpdates(conversationId) {
+async function getConversationUpdates(conversationId) {
   try {
-    const response = await fetch(`${API_URL}/api/conversation/${conversationId}/messages`);
+    const response = await fetch(`${config.API_URL}/api/conversation/${conversationId}/messages`);
     
     if (!response.ok) {
       if (response.status === 404) {
@@ -123,4 +123,11 @@ export async function getConversationUpdates(conversationId) {
     console.error('Error polling for updates:', error);
     throw error;
   }
-} 
+}
+
+export {
+  fetchAvailableTools,
+  sendMessage,
+  submitToolResult,
+  getConversationUpdates
+}; 

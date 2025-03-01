@@ -1,7 +1,7 @@
 /**
  * 状态管理模块 - 管理应用状态
  */
-import { DEFAULT_SETTINGS } from './config.js';
+import * as config from './config.js';
 
 /**
  * 应用状态管理类
@@ -29,7 +29,7 @@ class StateManager {
     this.lastToolCallId = null;
     
     // 设置
-    this.settings = { ...DEFAULT_SETTINGS };
+    this.settings = { ...config.DEFAULT_SETTINGS };
   }
   
   /**
@@ -165,4 +165,6 @@ class StateManager {
 }
 
 // 创建并导出状态管理实例
-export const state = new StateManager(); 
+const state = new StateManager();
+
+export { state }; 

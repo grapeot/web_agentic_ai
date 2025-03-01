@@ -1,7 +1,10 @@
 /**
  * UI 模块 - 处理DOM操作和界面渲染
  */
-import { ROLES, TOOL_DISPLAY, MESSAGE_TYPES } from './config.js';
+import * as config from './config.js';
+const ROLES = config.ROLES;
+const TOOL_DISPLAY = config.TOOL_DISPLAY;
+const MESSAGE_TYPES = config.MESSAGE_TYPES;
 
 /**
  * DOM元素缓存
@@ -24,7 +27,7 @@ const elements = {
   toolsSpinner: null,
   toolsGroup: null,
   toolResultModal: null,
-  toolResultTextarea: null,
+  toolResult: null,
   submitToolResultButton: null,
   autoExecutionIndicator: null,
   cancelAutoExecutionButton: null
@@ -33,7 +36,8 @@ const elements = {
 /**
  * 初始化UI元素引用
  */
-export function initializeUI() {
+function initializeUI() {
+  // 缓存DOM元素
   elements.chatMessages = document.getElementById('chat-messages');
   elements.userInput = document.getElementById('user-input');
   elements.sendButton = document.getElementById('send-button');
@@ -49,20 +53,18 @@ export function initializeUI() {
   elements.responseSpinner = document.getElementById('response-spinner');
   elements.toolsSpinner = document.getElementById('tools-spinner');
   elements.toolsGroup = document.getElementById('tools-group');
-  elements.toolResultModal = new bootstrap.Modal(document.getElementById('toolResultModal'));
-  elements.toolResultTextarea = document.getElementById('toolResult');
+  elements.toolResultModal = document.getElementById('toolResultModal');
+  elements.toolResult = document.getElementById('toolResult');
   elements.submitToolResultButton = document.getElementById('submitToolResult');
   elements.autoExecutionIndicator = document.getElementById('auto-execution-indicator');
   elements.cancelAutoExecutionButton = document.getElementById('cancel-auto-execution');
-  
-  return elements;
 }
 
 /**
  * 获取UI元素
  * @returns {Object} UI元素引用
  */
-export function getElements() {
+function getElements() {
   return elements;
 }
 
@@ -70,9 +72,12 @@ export function getElements() {
  * 显示加载状态
  * @param {boolean} isLoading - 是否显示加载状态
  */
-export function setLoading(isLoading) {
+function setLoading(isLoading) {
   if (elements.responseSpinner) {
     elements.responseSpinner.style.display = isLoading ? 'block' : 'none';
+  }
+  if (elements.sendButton) {
+    elements.sendButton.disabled = isLoading;
   }
 }
 
@@ -80,7 +85,7 @@ export function setLoading(isLoading) {
  * 设置工具加载状态
  * @param {boolean} isLoading - 是否显示工具加载状态
  */
-export function setToolsLoading(isLoading) {
+function setToolsLoading(isLoading) {
   if (elements.toolsSpinner) {
     elements.toolsSpinner.style.display = isLoading ? 'block' : 'none';
   }
@@ -90,7 +95,7 @@ export function setToolsLoading(isLoading) {
  * 显示或隐藏自动执行指示器
  * @param {boolean} visible - 是否显示
  */
-export function setAutoExecutionIndicator(visible) {
+function setAutoExecutionIndicator(visible) {
   if (elements.autoExecutionIndicator) {
     elements.autoExecutionIndicator.style.display = visible ? 'block' : 'none';
   }
@@ -99,28 +104,33 @@ export function setAutoExecutionIndicator(visible) {
 /**
  * 显示工具结果模态框
  */
-export function showToolResultModal() {
+function showToolResultModal() {
   if (elements.toolResultModal) {
-    elements.toolResultTextarea.value = '';
-    elements.toolResultModal.show();
+    elements.toolResultModal.style.display = 'block';
   }
 }
 
 /**
  * 隐藏工具结果模态框
  */
-export function hideToolResultModal() {
+function hideToolResultModal() {
   if (elements.toolResultModal) {
-    elements.toolResultModal.hide();
+    elements.toolResultModal.style.display = 'none';
+    if (elements.toolResult) {
+      elements.toolResult.value = '';
+    }
   }
 }
 
 /**
  * 清空聊天界面
  */
-export function clearChat() {
+function clearChat() {
   if (elements.chatMessages) {
     elements.chatMessages.innerHTML = '';
+  }
+  if (elements.userInput) {
+    elements.userInput.value = '';
   }
 }
 
@@ -129,110 +139,111 @@ export function clearChat() {
  * @param {string} role - 消息角色
  * @param {string} content - 消息内容
  */
-export function addMessageToChat(role, content) {
+function addMessageToChat(role, content) {
   if (!elements.chatMessages) return;
   
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${role}-message`;
-  messageDiv.innerHTML = marked.parse(content);
+  
+  // 根据消息类型处理内容
+  if (typeof content === 'string') {
+    // 纯文本消息
+    messageDiv.textContent = content;
+  } else if (content.type === MESSAGE_TYPES.TEXT) {
+    // 结构化文本消息
+    messageDiv.textContent = content.text;
+  }
+  
   elements.chatMessages.appendChild(messageDiv);
   elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-  
-  // 应用代码高亮
-  document.querySelectorAll('pre code').forEach((block) => {
-    hljs.highlightBlock(block);
-  });
 }
 
 /**
  * 添加思考内容到聊天界面
  * @param {string} thinking - 思考内容
  */
-export function addThinkingToChat(thinking) {
+function addThinkingToChat(thinking) {
   if (!elements.chatMessages) return;
   
   const thinkingDiv = document.createElement('div');
-  thinkingDiv.className = 'message thinking';
-  thinkingDiv.innerHTML = '<h5>思考过程:</h5>' + marked.parse(thinking);
+  thinkingDiv.className = `message ${ROLES.THINKING}-message`;
+  thinkingDiv.innerHTML = `<div class="thinking-label">思考过程:</div>
+                          <pre class="thinking-content">${escapeHtml(thinking)}</pre>`;
+  
   elements.chatMessages.appendChild(thinkingDiv);
   elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-  
-  // 应用代码高亮
-  document.querySelectorAll('pre code').forEach((block) => {
-    hljs.highlightBlock(block);
-  });
 }
 
 /**
  * 添加工具调用到聊天界面
  * @param {Object} toolCall - 工具调用对象
  */
-export function addToolCallToChat(toolCall) {
+function addToolCallToChat(toolCall) {
   if (!elements.chatMessages) return;
   
   const toolCallDiv = document.createElement('div');
-  toolCallDiv.className = 'message tool-call';
-  toolCallDiv.dataset.toolId = toolCall.id;
+  toolCallDiv.className = 'tool-call';
+  toolCallDiv.dataset.toolUseId = toolCall.id;
   
+  // 创建工具调用头部
   const header = document.createElement('div');
   header.className = 'tool-call-header';
+  header.innerHTML = `
+    <span class="tool-call-toggle">${TOOL_DISPLAY.INITIAL_COLLAPSED ? TOOL_DISPLAY.EXPAND_ARROW : TOOL_DISPLAY.COLLAPSE_ARROW}</span>
+    <strong>Tool Call: ${escapeHtml(toolCall.name)}</strong>
+  `;
   
-  const arrow = document.createElement('span');
-  arrow.className = 'toggle-arrow';
-  arrow.innerHTML = TOOL_DISPLAY.COLLAPSE_ARROW; // 初始折叠状态
-  header.appendChild(arrow);
-  
-  const headerText = document.createElement('span');
-  headerText.textContent = `工具调用: ${toolCall.name}`;
-  header.appendChild(headerText);
-  
-  toolCallDiv.appendChild(header);
-  
+  // 创建工具调用内容
   const content = document.createElement('div');
-  content.className = 'tool-content collapsed'; // 默认折叠
+  content.className = 'tool-call-content';
+  content.style.display = TOOL_DISPLAY.INITIAL_COLLAPSED ? 'none' : 'block';
   
-  if (toolCall.input) {
-    const inputLabel = document.createElement('div');
-    inputLabel.className = 'tool-section-label';
-    inputLabel.textContent = '输入参数:';
-    content.appendChild(inputLabel);
-    
-    const toolInput = document.createElement('div');
-    toolInput.className = 'tool-input';
-    
-    try {
-      let jsonInput;
-      if (typeof toolCall.input === 'string') {
-        jsonInput = JSON.parse(toolCall.input);
-      } else {
-        jsonInput = toolCall.input;
-      }
-      
-      const formattedJson = JSON.stringify(jsonInput, null, 2);
-      toolInput.innerHTML = `<pre>${formattedJson}</pre>`;
-    } catch (e) {
-      toolInput.innerHTML = `<pre>${toolCall.input}</pre>`;
-    }
-    
-    content.appendChild(toolInput);
-  }
+  // 参数格式化
+  const formattedParams = JSON.stringify(toolCall.input, null, 2);
+  content.innerHTML = `<pre>${escapeHtml(formattedParams)}</pre>`;
   
-  const resultLabel = document.createElement('div');
-  resultLabel.className = 'tool-section-label';
-  resultLabel.textContent = '结果:';
-  content.appendChild(resultLabel);
+  // 创建工具执行按钮
+  const executeButton = document.createElement('button');
+  executeButton.className = 'execute-tool-button';
+  executeButton.textContent = '执行工具';
+  executeButton.dataset.toolUseId = toolCall.id;
+  executeButton.dataset.toolName = toolCall.name;
+  executeButton.dataset.toolInput = JSON.stringify(toolCall.input);
   
-  const resultContainer = document.createElement('div');
-  resultContainer.className = 'tool-result-container';
-  resultContainer.dataset.forToolId = toolCall.id;
+  // 工具执行状态标签
+  const statusLabel = document.createElement('span');
+  statusLabel.className = 'tool-status';
+  statusLabel.dataset.toolUseId = toolCall.id;
   
-  content.appendChild(resultContainer);
+  // 组装工具调用UI
+  toolCallDiv.appendChild(header);
   toolCallDiv.appendChild(content);
+  toolCallDiv.appendChild(executeButton);
+  toolCallDiv.appendChild(statusLabel);
   
+  // 添加到聊天界面
   elements.chatMessages.appendChild(toolCallDiv);
   elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
   
-  return toolCallDiv;
+  // 添加事件监听器
+  header.addEventListener('click', function() {
+    const isCollapsed = content.style.display === 'none';
+    content.style.display = isCollapsed ? 'block' : 'none';
+    const toggle = this.querySelector('.tool-call-toggle');
+    if (toggle) {
+      toggle.innerHTML = isCollapsed ? TOOL_DISPLAY.COLLAPSE_ARROW : TOOL_DISPLAY.EXPAND_ARROW;
+    }
+  });
+  
+  // 工具执行按钮事件
+  executeButton.addEventListener('click', function() {
+    // 显示工具结果输入模态框
+    showToolResultModal();
+    
+    // 将工具ID存储在全局状态
+    // 注：这里应改为调用状态管理模块
+    currentToolUseId = toolCall.id;
+  });
 }
 
 /**
@@ -240,332 +251,361 @@ export function addToolCallToChat(toolCall) {
  * @param {string} result - 工具结果
  * @param {string} toolUseId - 工具使用ID
  */
-export function addToolResultToChat(result, toolUseId) {
+function addToolResultToChat(result, toolUseId) {
   if (!elements.chatMessages) return;
   
-  const resultContainer = document.querySelector(`.tool-result-container[data-for-tool-id="${toolUseId}"]`);
-  let resultDiv;
+  // 查找对应的工具调用
+  const toolCallDiv = document.querySelector(`.tool-call[data-tool-use-id="${toolUseId}"]`);
+  if (!toolCallDiv) return;
   
-  if (resultContainer) {
-    // 将结果添加到现有工具调用
-    resultDiv = document.createElement('div');
-    resultDiv.className = 'tool-result';
-    resultDiv.dataset.resultId = toolUseId;
-    
-    processToolResult(resultDiv, result);
-    resultContainer.appendChild(resultDiv);
-    
-    // 确保工具调用保持折叠状态
-    const toolCallDiv = resultContainer.closest('.tool-call');
-    if (toolCallDiv) {
-      const toolContent = toolCallDiv.querySelector('.tool-content');
-      if (toolContent) {
-        toolContent.classList.add('collapsed');
-      }
-    }
-  } else {
-    console.warn(`工具容器 ID ${toolUseId} 未找到，创建独立结果`);
-    
-    // 创建独立结果
-    resultDiv = document.createElement('div');
-    resultDiv.className = 'message tool-result';
-    resultDiv.dataset.resultId = toolUseId;
-    
-    processToolResult(resultDiv, result);
-    elements.chatMessages.appendChild(resultDiv);
+  // 查找状态标签
+  const statusLabel = toolCallDiv.querySelector('.tool-status');
+  if (statusLabel) {
+    statusLabel.textContent = '已完成';
+    statusLabel.classList.add('completed');
   }
   
-  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-  return resultDiv;
-}
-
-/**
- * 处理工具结果内容
- * @param {HTMLElement} container - 要添加结果的容器元素
- * @param {string} result - 工具结果
- * @private
- */
-function processToolResult(container, result) {
-  let resultContent = '';
-  let parsedResult = null;
+  // 禁用执行按钮
+  const executeButton = toolCallDiv.querySelector('.execute-tool-button');
+  if (executeButton) {
+    executeButton.disabled = true;
+  }
   
+  // 创建工具结果容器
+  const resultDiv = document.createElement('div');
+  resultDiv.className = 'tool-result';
+  
+  // 处理不同类型的结果
   try {
     // 尝试解析JSON结果
-    parsedResult = JSON.parse(result);
+    const parsedResult = typeof result === 'string' ? JSON.parse(result) : result;
     
-    // 检查是否为文件结果
-    if (parsedResult.status === "success" && parsedResult.file_path && parsedResult.file_url) {
-      // 文件结果处理
-      resultContent = processFileResult(parsedResult);
-    } 
-    // 检查是否有生成的文件列表
-    else if (parsedResult.status === "success" && parsedResult.generated_files && parsedResult.generated_files.length > 0) {
-      resultContent = processGeneratedFiles(parsedResult);
-    }
-    else {
-      // 常规JSON结果
-      resultContent = `<pre>${JSON.stringify(parsedResult, null, 2)}</pre>`;
+    if (parsedResult.files) {
+      // 文件结果
+      if (Array.isArray(parsedResult.files) && parsedResult.files.length > 1) {
+        resultDiv.innerHTML = processGeneratedFiles(parsedResult);
+      } else {
+        resultDiv.innerHTML = processFileResult(parsedResult.files[0]);
+      }
+      
+      // 添加文件结果事件监听器
+      addFileResultEventListeners(resultDiv, parsedResult);
+    } else {
+      // 普通结果
+      resultDiv.innerHTML = processToolResult(resultDiv, parsedResult);
     }
   } catch (e) {
-    // 非JSON，按文本显示
-    console.error("解析工具结果错误:", e);
-    resultContent = `<pre>${result}</pre>`;
+    // 非JSON格式，作为纯文本显示
+    resultDiv.textContent = result;
   }
   
-  container.innerHTML = resultContent;
-  
-  // 添加各类按钮事件监听器
-  addFileResultEventListeners(container, parsedResult);
+  // 添加到对应的工具调用后面
+  toolCallDiv.appendChild(resultDiv);
+  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
 }
 
-/**
- * 处理文件结果
- * @param {Object} fileResult - 文件结果对象
- * @returns {string} HTML内容
- * @private
- */
+function processToolResult(container, result) {
+  // 格式化JSON结果
+  const formattedResult = JSON.stringify(result, null, 2);
+  
+  // 构建结果UI
+  let resultHtml = `
+    <div class="result-header">
+      <span class="result-toggle">${TOOL_DISPLAY.COLLAPSE_ARROW}</span>
+      <strong>Tool Result</strong>
+    </div>
+    <div class="result-content">
+      <pre class="result-json">${escapeHtml(formattedResult)}</pre>
+    </div>
+  `;
+  
+  // 为结果添加折叠/展开功能
+  setTimeout(() => {
+    const header = container.querySelector('.result-header');
+    const content = container.querySelector('.result-content');
+    const toggle = container.querySelector('.result-toggle');
+    
+    if (header && content && toggle) {
+      header.addEventListener('click', function() {
+        const isCollapsed = content.style.display === 'none';
+        content.style.display = isCollapsed ? 'block' : 'none';
+        toggle.innerHTML = isCollapsed ? TOOL_DISPLAY.COLLAPSE_ARROW : TOOL_DISPLAY.EXPAND_ARROW;
+      });
+    }
+  }, 0);
+  
+  return resultHtml;
+}
+
 function processFileResult(fileResult) {
-  const fileName = fileResult.file_path.split('/').pop();
-  let content = '';
+  // 基础文件信息
+  let resultHtml = `
+    <div class="file-result">
+      <h4>${escapeHtml(fileResult.name || 'Generated File')}</h4>
+  `;
   
-  // 文件结果头部
-  content += `<div class="file-result-header">
-    <strong>文件已保存:</strong> ${fileName}
-    <a href="${fileResult.file_url}" target="_blank" class="file-download-link">
-      <i class="fas fa-download"></i> 下载
-    </a>
-  </div>`;
+  // 文件类型特定处理
+  const isImage = fileResult.mime_type && fileResult.mime_type.startsWith('image/');
+  const isMarkdown = fileResult.name && fileResult.name.endsWith('.md');
+  const isHtml = fileResult.name && (fileResult.name.endsWith('.html') || fileResult.name.endsWith('.htm'));
   
-  // 根据文件类型添加预览
-  if (fileResult.render_type === "image") {
-    content += `<div class="file-preview image-preview">
-      <img src="${fileResult.file_url}" alt="${fileName}" class="preview-image" />
-    </div>`;
-  } else if (fileResult.render_type === "markdown") {
-    content += `<div class="file-preview markdown-preview-btn">
-      <button class="btn btn-sm btn-outline-primary view-markdown" data-url="${fileResult.view_url}">
-        <i class="fas fa-file-alt"></i> 查看Markdown
-      </button>
-    </div>`;
-  } else if (fileResult.render_type === "html") {
-    content += `<div class="file-preview html-preview-btn">
-      <button class="btn btn-sm btn-outline-primary view-html" data-url="${fileResult.view_url}">
-        <i class="fas fa-code"></i> 查看HTML
-      </button>
-    </div>`;
+  // 添加对应的预览
+  if (isImage && fileResult.url) {
+    resultHtml += `<img src="${fileResult.url}" alt="${escapeHtml(fileResult.name)}" class="file-preview" />`;
+  } else if (isMarkdown && fileResult.url) {
+    resultHtml += `
+      <div class="markdown-actions">
+        <button class="view-markdown-btn" data-url="${fileResult.url}">查看Markdown</button>
+      </div>
+      <div class="markdown-preview" style="display:none;"></div>
+    `;
+  } else if (isHtml && fileResult.url) {
+    resultHtml += `
+      <div class="html-actions">
+        <button class="view-html-btn" data-url="${fileResult.url}">查看HTML</button>
+        <a href="${fileResult.url}" target="_blank" class="open-html-link">在新标签页打开</a>
+      </div>
+      <div class="html-preview" style="display:none;"></div>
+    `;
   }
   
-  // 添加完整JSON详情（折叠）
-  content += `<div class="file-json-details collapsed">
-    <button class="btn btn-sm btn-outline-secondary toggle-json">显示详情</button>
-    <pre class="json-content" style="display:none;">${JSON.stringify(fileResult, null, 2)}</pre>
-  </div>`;
+  // 文件下载链接
+  if (fileResult.url) {
+    resultHtml += `
+      <div class="file-download">
+        <a href="${fileResult.url}" download="${fileResult.name}" class="download-link">下载文件</a>
+      </div>
+    `;
+  }
   
-  return content;
+  // 添加文件详细信息（折叠）
+  resultHtml += `
+      <div class="file-details-toggle">详细信息 ${TOOL_DISPLAY.EXPAND_ARROW}</div>
+      <div class="file-details" style="display:none;">
+        <pre>${escapeHtml(JSON.stringify(fileResult, null, 2))}</pre>
+      </div>
+    </div>
+  `;
+  
+  return resultHtml;
 }
 
-/**
- * 处理多个生成的文件
- * @param {Object} result - 包含生成文件的结果对象
- * @returns {string} HTML内容
- * @private
- */
 function processGeneratedFiles(result) {
-  let content = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+  let filesHtml = `
+    <div class="generated-files">
+      <h4>生成的文件 (${result.files.length})</h4>
+      <ul class="files-list">
+  `;
   
-  // 添加生成文件部分
-  content += `<div class="generated-files-section">
-    <h5>生成的文件:</h5>
-  </div>`;
-  
-  // 处理每个生成的文件
-  for (const file of result.generated_files) {
-    const fileName = file.file_name || file.file_path.split('/').pop();
+  // 为每个文件创建列表项
+  result.files.forEach(file => {
+    filesHtml += `
+      <li class="file-item">
+        <span class="file-name">${escapeHtml(file.name || 'Unnamed File')}</span>
+        <div class="file-actions">
+    `;
     
-    content += `<div class="file-result">
-      <div class="file-result-header">
-        <strong>文件:</strong> ${fileName}
-        <a href="${file.file_url}" target="_blank" class="file-download-link">
-          <i class="fas fa-download"></i> 下载
-        </a>
-      </div>`;
+    // 根据文件类型添加操作按钮
+    const isMarkdown = file.name && file.name.endsWith('.md');
+    const isHtml = file.name && (file.name.endsWith('.html') || file.name.endsWith('.htm'));
     
-    // 根据文件类型添加预览
-    if (file.render_type === "image") {
-      content += `<div class="file-preview image-preview">
-        <img src="${file.file_url}" alt="${fileName}" class="preview-image" />
-      </div>`;
-    } else if (file.render_type === "markdown") {
-      content += `<div class="file-preview markdown-preview-btn">
-        <button class="btn btn-sm btn-outline-primary view-markdown" data-url="${file.view_url || file.file_url}">
-          <i class="fas fa-file-alt"></i> 查看Markdown
-        </button>
-      </div>`;
-    } else if (file.render_type === "html") {
-      content += `<div class="file-preview html-preview-btn">
-        <button class="btn btn-sm btn-outline-primary view-html" data-url="${file.view_url || file.file_url}">
-          <i class="fas fa-code"></i> 查看HTML
-        </button>
-      </div>`;
+    if (isMarkdown && file.url) {
+      filesHtml += `<button class="view-markdown-btn" data-url="${file.url}">查看</button>`;
+    } else if (isHtml && file.url) {
+      filesHtml += `<button class="view-html-btn" data-url="${file.url}">查看</button>`;
     }
     
-    content += `</div>`;  // 关闭file-result div
-  }
+    // 下载链接
+    if (file.url) {
+      filesHtml += `<a href="${file.url}" download="${file.name}" class="download-link">下载</a>`;
+    }
+    
+    filesHtml += `
+        </div>
+      </li>
+    `;
+  });
   
-  return content;
+  filesHtml += `
+      </ul>
+      <div class="files-details-toggle">详细信息 ${TOOL_DISPLAY.EXPAND_ARROW}</div>
+      <div class="files-details" style="display:none;">
+        <pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>
+      </div>
+    </div>
+  `;
+  
+  return filesHtml;
 }
 
-/**
- * 为文件结果添加事件监听器
- * @param {HTMLElement} container - 容器元素
- * @param {Object} parsedResult - 解析后的结果对象
- * @private
- */
 function addFileResultEventListeners(container, parsedResult) {
-  if (!parsedResult) return;
-  
-  // 检查是否有文件结果需要添加事件监听器
-  if (parsedResult.render_type || (parsedResult.generated_files && parsedResult.generated_files.length > 0)) {
+  setTimeout(() => {
     // Markdown查看按钮
-    const viewMarkdownBtns = container.querySelectorAll('.view-markdown');
-    viewMarkdownBtns.forEach(btn => {
+    const markdownBtns = container.querySelectorAll('.view-markdown-btn');
+    markdownBtns.forEach(btn => {
       btn.addEventListener('click', function() {
-        const url = this.getAttribute('data-url');
-        fetchAndDisplayMarkdown(url, container);
+        const url = this.dataset.url;
+        const previewContainer = this.parentElement.nextElementSibling || 
+                                 this.parentElement.parentElement.querySelector('.markdown-preview');
+        
+        if (previewContainer) {
+          if (previewContainer.style.display === 'none') {
+            previewContainer.style.display = 'block';
+            this.textContent = '隐藏Markdown';
+            fetchAndDisplayMarkdown(url, previewContainer);
+          } else {
+            previewContainer.style.display = 'none';
+            this.textContent = '查看Markdown';
+          }
+        }
       });
     });
     
     // HTML查看按钮
-    const viewHtmlBtns = container.querySelectorAll('.view-html');
-    viewHtmlBtns.forEach(btn => {
+    const htmlBtns = container.querySelectorAll('.view-html-btn');
+    htmlBtns.forEach(btn => {
       btn.addEventListener('click', function() {
-        const url = this.getAttribute('data-url');
-        displayHtmlPreview(url, container);
+        const url = this.dataset.url;
+        const previewContainer = this.parentElement.nextElementSibling || 
+                                this.parentElement.parentElement.querySelector('.html-preview');
+        
+        if (previewContainer) {
+          if (previewContainer.style.display === 'none') {
+            previewContainer.style.display = 'block';
+            this.textContent = '隐藏HTML';
+            displayHtmlPreview(url, previewContainer);
+          } else {
+            previewContainer.style.display = 'none';
+            this.textContent = '查看HTML';
+          }
+        }
       });
     });
     
-    // JSON切换按钮
-    const toggleJsonBtns = container.querySelectorAll('.toggle-json');
-    toggleJsonBtns.forEach(btn => {
-      btn.addEventListener('click', function() {
-        const jsonContent = this.nextElementSibling;
-        const isHidden = jsonContent.style.display === 'none';
-        jsonContent.style.display = isHidden ? 'block' : 'none';
-        this.textContent = isHidden ? '隐藏详情' : '显示详情';
+    // 文件详情切换
+    const fileDetailsToggles = container.querySelectorAll('.file-details-toggle, .files-details-toggle');
+    fileDetailsToggles.forEach(toggle => {
+      toggle.addEventListener('click', function() {
+        const details = this.nextElementSibling;
+        if (details) {
+          const isCollapsed = details.style.display === 'none';
+          details.style.display = isCollapsed ? 'block' : 'none';
+          this.innerHTML = `详细信息 ${isCollapsed ? TOOL_DISPLAY.COLLAPSE_ARROW : TOOL_DISPLAY.EXPAND_ARROW}`;
+        }
       });
     });
-  }
+  }, 0);
 }
 
-/**
- * 获取并显示Markdown内容
- * @param {string} url - Markdown文件URL
- * @param {HTMLElement} container - 容器元素
- */
-export async function fetchAndDisplayMarkdown(url, container) {
-  const previewContainer = document.createElement('div');
-  previewContainer.className = 'markdown-content-preview';
-  previewContainer.innerHTML = '<div class="preview-loading"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+async function fetchAndDisplayMarkdown(url, container) {
+  if (!container) return;
   
-  // 找到预览按钮容器并在其后添加
-  const btnContainer = container.querySelector('.markdown-preview-btn');
-  if (btnContainer) {
-    btnContainer.after(previewContainer);
-  } else {
-    container.appendChild(previewContainer);
-  }
+  // 显示加载状态
+  container.innerHTML = '<div class="loading-spinner">加载中...</div>';
   
   try {
-    // 获取Markdown内容
     const response = await fetch(url);
-    
     if (!response.ok) {
-      throw new Error('网络响应异常');
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
     
-    const markdown = await response.text();
+    const markdownText = await response.text();
     
-    // 渲染Markdown
-    previewContainer.innerHTML = `
-      <div class="markdown-preview-header">
-        <button class="btn btn-sm btn-outline-secondary close-preview">
-          <i class="fas fa-times"></i> 关闭预览
-        </button>
-      </div>
-      <div class="markdown-preview-content">${marked.parse(markdown)}</div>
-    `;
+    // 简单的Markdown渲染
+    // 注意：实际项目中应使用完整的Markdown解析器
+    let html = markdownText
+      // 标题
+      .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+      .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+      .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+      // 加粗
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      // 斜体
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      // 代码块
+      .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+      // 行内代码
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      // 链接
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+      // 列表项
+      .replace(/^\s*-\s+(.*$)/gm, '<li>$1</li>')
+      // 段落
+      .replace(/^(?!<[a-z])/gm, '<p>$&</p>');
     
-    // 添加关闭按钮功能
-    const closeBtn = previewContainer.querySelector('.close-preview');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        previewContainer.remove();
-      });
-    }
+    // 将连续的li元素包装在ul中
+    html = html.replace(/<li>[\s\S]*?<\/li>(?=[\s\S]*?<li>|$)/g, '<ul>$&</ul>');
     
-    // 应用代码高亮
-    previewContainer.querySelectorAll('pre code').forEach((block) => {
-      hljs.highlightBlock(block);
+    // 清理空的p标签
+    html = html.replace(/<p><\/p>/g, '');
+    
+    container.innerHTML = html;
+    
+    // 为链接添加样式和行为
+    const links = container.querySelectorAll('a');
+    links.forEach(link => {
+      link.classList.add('markdown-link');
     });
+    
   } catch (error) {
-    previewContainer.innerHTML = `<div class="alert alert-danger">加载Markdown失败: ${error.message}</div>`;
+    console.error('Error loading markdown:', error);
+    container.innerHTML = `<div class="error-message">加载失败: ${error.message}</div>`;
   }
 }
 
-/**
- * 显示HTML预览
- * @param {string} url - HTML文件URL
- * @param {HTMLElement} container - 容器元素
- */
-export function displayHtmlPreview(url, container) {
-  const previewContainer = document.createElement('div');
-  previewContainer.className = 'html-content-preview';
+function displayHtmlPreview(url, container) {
+  if (!container) return;
   
-  // 创建iframe容器和头部
-  previewContainer.innerHTML = `
-    <div class="html-preview-header">
-      <button class="btn btn-sm btn-outline-secondary close-preview">
-        <i class="fas fa-times"></i> 关闭预览
-      </button>
-      <a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary">
-        <i class="fas fa-external-link-alt"></i> 在新标签页中打开
-      </a>
-    </div>
-    <div class="iframe-container">
-      <iframe src="${url}" sandbox="allow-scripts" class="html-preview-iframe"></iframe>
-    </div>
-  `;
+  // 创建iframe以安全显示HTML
+  const iframe = document.createElement('iframe');
+  iframe.className = 'html-preview-frame';
+  iframe.setAttribute('sandbox', 'allow-scripts');
+  iframe.src = url;
   
-  // 找到预览按钮容器并在其后添加
-  const btnContainer = container.querySelector('.html-preview-btn');
-  if (btnContainer) {
-    btnContainer.after(previewContainer);
-  } else {
-    container.appendChild(previewContainer);
-  }
+  // 创建关闭按钮
+  const closeButton = document.createElement('button');
+  closeButton.className = 'close-preview-btn';
+  closeButton.textContent = '关闭预览';
+  closeButton.addEventListener('click', () => {
+    container.style.display = 'none';
+    // 更新查看按钮文本
+    const viewBtn = container.previousElementSibling.querySelector('.view-html-btn');
+    if (viewBtn) {
+      viewBtn.textContent = '查看HTML';
+    }
+  });
   
-  // 添加关闭按钮功能
-  const closeBtn = previewContainer.querySelector('.close-preview');
-  if (closeBtn) {
-    closeBtn.addEventListener('click', () => {
-      previewContainer.remove();
-    });
-  }
+  // 清除现有内容
+  container.innerHTML = '';
+  container.appendChild(iframe);
+  container.appendChild(closeButton);
 }
 
 /**
  * 显示可用工具列表
  * @param {Array} tools - 工具列表
  */
-export function displayTools(tools) {
+function displayTools(tools) {
   if (!elements.toolsGroup) return;
   
+  // 清空现有工具列表
   elements.toolsGroup.innerHTML = '';
   
+  // 为每个工具创建列表项
   tools.forEach(tool => {
     const li = document.createElement('li');
-    li.className = 'list-group-item';
-    li.innerHTML = `<strong>${tool.name}</strong>: ${tool.description}`;
+    li.className = 'tool-item';
+    
+    const toolName = document.createElement('div');
+    toolName.className = 'tool-name';
+    toolName.textContent = tool.name;
+    
+    const toolDesc = document.createElement('div');
+    toolDesc.className = 'tool-description';
+    toolDesc.textContent = tool.description || '无描述';
+    
+    li.appendChild(toolName);
+    li.appendChild(toolDesc);
     elements.toolsGroup.appendChild(li);
   });
 }
@@ -575,12 +615,36 @@ export function displayTools(tools) {
  * @param {string} text - 要转义的文本
  * @returns {string} 转义后的文本
  */
-export function escapeHtml(text) {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-    .replace(/\n/g, '<br>');
-} 
+function escapeHtml(text) {
+  if (!text) return '';
+  
+  const entities = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  };
+  
+  return text.toString().replace(/[&<>"']/g, char => entities[char]);
+}
+
+// ES模块导出
+export {
+  initializeUI,
+  getElements,
+  setLoading,
+  setToolsLoading,
+  setAutoExecutionIndicator,
+  showToolResultModal,
+  hideToolResultModal,
+  clearChat,
+  addMessageToChat,
+  addThinkingToChat,
+  addToolCallToChat,
+  addToolResultToChat,
+  fetchAndDisplayMarkdown,
+  displayHtmlPreview,
+  displayTools,
+  escapeHtml
+}; 
