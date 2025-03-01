@@ -27,10 +27,10 @@ function initApp() {
   events.setupEventListeners(ui.getElements());
   
   // Get available tools list
-  api.fetchAvailableTools()
+  fetchAvailableTools()
     .then(data => {
       if (data && data.tools) {
-        ui.displayTools(data.tools);
+        ui.renderTools(data.tools);
       }
     })
     .catch(error => {
@@ -312,5 +312,25 @@ export {
   sendMessage,
   submitToolResult,
   clearChat,
-  updateSetting
-}; 
+  updateSetting,
+  fetchAvailableTools
+};
+
+// 获取可用工具
+async function fetchAvailableTools() {
+  try {
+    ui.setToolsLoading(true);
+    const data = await api.fetchAvailableTools();
+    
+    if (data.tools && Array.isArray(data.tools)) {
+      ui.renderTools(data.tools);
+    }
+    
+    ui.setToolsLoading(false);
+    return data;
+  } catch (error) {
+    console.error('Error fetching tools:', error);
+    ui.setToolsLoading(false);
+    return null;
+  }
+} 

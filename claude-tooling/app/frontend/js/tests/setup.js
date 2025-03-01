@@ -1,7 +1,7 @@
-// 导入fetch polyfill
+// Import fetch polyfill
 import 'whatwg-fetch';
 
-// 模拟localStorage
+// Mock localStorage
 global.localStorage = {
   getItem: jest.fn(),
   setItem: jest.fn(),
@@ -9,7 +9,7 @@ global.localStorage = {
   clear: jest.fn()
 };
 
-// 模拟window.location
+// Mock window.location
 Object.defineProperty(window, 'location', {
   value: {
     origin: 'http://localhost',
@@ -20,7 +20,7 @@ Object.defineProperty(window, 'location', {
   writable: true
 });
 
-// 模拟Bootstrap类
+// Mock Bootstrap class
 global.bootstrap = {
   Modal: class {
     constructor() {
@@ -30,12 +30,12 @@ global.bootstrap = {
   }
 };
 
-// 模拟marked库
+// Mock marked library
 global.marked = {
   parse: jest.fn(text => `<p>${text}</p>`)
 };
 
-// 模拟highlight.js
+// Mock highlight.js
 global.hljs = {
   highlightBlock: jest.fn(),
   highlightElement: jest.fn(),
@@ -44,22 +44,22 @@ global.hljs = {
   highlightAuto: jest.fn().mockReturnValue({ value: '' })
 };
 
-// 创建DOM元素mock辅助方法
+// Helper method to create DOM element mocks
 global.createElementMock = (id, type = 'div', attributes = {}) => {
   const element = document.createElement(type);
   element.id = id;
   
-  // 添加其他属性
+  // Add other attributes
   Object.entries(attributes).forEach(([key, value]) => {
     element[key] = value;
   });
   
-  // 添加元素到body
+  // Add element to body
   document.body.appendChild(element);
   return element;
 };
 
-// 清理测试DOM辅助方法
+// Helper method to clean up test DOM
 global.cleanupDOM = () => {
   document.body.innerHTML = '';
 }; 

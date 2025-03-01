@@ -1,14 +1,14 @@
 /**
- * 主要功能测试文件
- * 测试主要的聊天和工具调用功能
+ * Main functionality test file
+ * Tests primary chat and tool calling features
  */
 
-// 从main.js导入函数
+// Import functions from main.js
 import * as mainModule from '../main.js';
-// 从api.js导入函数，用于mock
+// Import functions from api.js for mocking
 import * as api from '../modules/api.js';
 
-// Mock API模块
+// Mock API module
 jest.mock('../modules/api.js', () => ({
   fetchAvailableTools: jest.fn(),
   sendMessage: jest.fn(),
@@ -17,12 +17,12 @@ jest.mock('../modules/api.js', () => ({
 }));
 
 describe('Chat Application Main Features', () => {
-  // 在每个测试前设置DOM环境
+  // Set up DOM environment before each test
   beforeEach(() => {
-    // 清理之前的DOM
+    // Clean up previous DOM
     document.body.innerHTML = '';
     
-    // 创建必要的DOM元素
+    // Create necessary DOM elements
     global.createElementMock('chat-messages');
     global.createElementMock('user-input', 'textarea');
     global.createElementMock('send-button', 'button');
@@ -39,7 +39,7 @@ describe('Chat Application Main Features', () => {
     global.createElementMock('tools-spinner', 'div', { style: { display: 'none' } });
     global.createElementMock('tools-group', 'ul');
     
-    // 创建其他必要的元素
+    // Create other necessary elements
     const toolResultModal = document.createElement('div');
     toolResultModal.id = 'toolResultModal';
     document.body.appendChild(toolResultModal);
@@ -61,49 +61,49 @@ describe('Chat Application Main Features', () => {
     cancelAutoExecutionButton.id = 'cancel-auto-execution';
     document.body.appendChild(cancelAutoExecutionButton);
     
-    // 重置所有API模块mock
+    // Reset all API module mocks
     jest.clearAllMocks();
     
-    // 清除任何已有的定时器
+    // Clear any existing timers
     jest.useFakeTimers();
   });
   
-  // 清理测试环境
+  // Clean up test environment
   afterEach(() => {
-    // 重置所有mock
+    // Reset all mocks
     jest.resetAllMocks();
     
-    // 清理DOM
+    // Clean up DOM
     global.cleanupDOM();
     
-    // 恢复真实定时器
+    // Restore real timers
     jest.useRealTimers();
   });
   
   /**
-   * 测试：聊天界面初始化
-   * 检查所有元素是否正确加载和初始化
+   * Test: Chat interface initialization
+   * Check if all elements are correctly loaded and initialized
    */
-  test('应用应正确初始化', () => {
-    // 设置API mock
+  test('Application should initialize correctly', () => {
+    // Set up API mock
     api.fetchAvailableTools.mockResolvedValueOnce({ tools: [] });
     
-    // 初始化应用
+    // Initialize application
     mainModule.initApp();
     
-    // 验证初始化API调用
+    // Verify initialization API call
     expect(api.fetchAvailableTools).toHaveBeenCalled();
   });
   
   /**
-   * 测试：发送消息功能
-   * 验证用户消息发送和API调用
+   * Test: Send message functionality
+   * Verify user message sending and API call
    */
-  test('应能正确发送用户消息', async () => {
-    // 设置API mock
+  test('Should send user messages correctly', async () => {
+    // Set up API mock
     api.fetchAvailableTools.mockResolvedValueOnce({ tools: [] });
     
-    // 模拟成功的API响应
+    // Mock successful API response
     const mockResponse = {
       conversation_id: 'test-convo-id',
       message: {
@@ -116,30 +116,30 @@ describe('Chat Application Main Features', () => {
     
     api.sendMessage.mockResolvedValueOnce(mockResponse);
     
-    // 初始化应用
+    // Initialize application
     mainModule.initApp();
     
-    // 填写用户输入
+    // Fill in user input
     const userInput = document.getElementById('user-input');
     userInput.value = 'Hello, Claude!';
     
-    // 调用发送消息函数
+    // Call send message function
     await mainModule.sendMessage();
     
-    // 验证API调用
+    // Verify API call
     expect(api.sendMessage).toHaveBeenCalled();
     
-    // 验证响应处理 - 检查聊天界面上是否显示了消息
+    // Verify response handling - check if message is displayed in chat interface
     const chatMessages = document.getElementById('chat-messages');
     expect(chatMessages.innerHTML).toContain('Hello, Claude!');
   });
   
   /**
-   * 测试：工具调用功能
-   * 验证工具调用和结果提交
+   * Test: Tool call functionality
+   * Verify tool call and result submission
    */
-  test('应能正确处理工具调用', async () => {
-    // 设置API mock
+  test('Should handle tool calls correctly', async () => {
+    // Set up API mock
     api.fetchAvailableTools.mockResolvedValueOnce({
       tools: [{
         name: 'testTool',
@@ -147,7 +147,7 @@ describe('Chat Application Main Features', () => {
       }]
     });
     
-    // 模拟消息发送响应（含工具调用）
+    // Mock message send response (with tool call)
     api.sendMessage.mockResolvedValueOnce({
       conversation_id: 'test-convo-id',
       message: {
@@ -168,7 +168,7 @@ describe('Chat Application Main Features', () => {
       }]
     });
     
-    // 模拟工具结果提交响应
+    // Mock tool result submission response
     api.submitToolResult.mockResolvedValueOnce({
       message: {
         content: [{
@@ -178,65 +178,65 @@ describe('Chat Application Main Features', () => {
       }
     });
     
-    // 初始化应用
+    // Initialize application
     mainModule.initApp();
     
-    // 填写用户输入
+    // Fill in user input
     const userInput = document.getElementById('user-input');
     userInput.value = 'Use a tool';
     
-    // 调用发送消息函数
+    // Call send message function
     await mainModule.sendMessage();
     
-    // 验证工具调用被添加到聊天
+    // Verify tool call was added to chat
     const chatMessages = document.getElementById('chat-messages');
     expect(chatMessages.innerHTML).toContain('testTool');
     
-    // 填写工具结果
+    // Fill in tool result
     document.getElementById('toolResult').value = '{"result": "success"}';
     
-    // 提交工具结果
+    // Submit tool result
     await mainModule.submitToolResult();
     
-    // 验证工具结果提交
+    // Verify tool result submission
     expect(api.submitToolResult).toHaveBeenCalled();
   });
   
   /**
-   * 测试：清除聊天功能
+   * Test: Clear chat functionality
    */
-  test('应能正确清除聊天', () => {
-    // 设置API mock
+  test('Should clear chat correctly', () => {
+    // Set up API mock
     api.fetchAvailableTools.mockResolvedValueOnce({ tools: [] });
     
-    // 初始化应用
+    // Initialize application
     mainModule.initApp();
     
-    // 添加一些消息到聊天界面
+    // Add some messages to chat interface
     const chatMessages = document.getElementById('chat-messages');
     chatMessages.innerHTML = '<div class="message">Test message</div>';
     
-    // 调用清除函数
+    // Call clear function
     mainModule.clearChat();
     
-    // 验证聊天已清除
+    // Verify chat has been cleared
     expect(chatMessages.innerHTML).toBe('');
   });
   
   /**
-   * 测试：更新设置值
+   * Test: Update settings value
    */
-  test('应能正确更新设置值', () => {
-    // 设置API mock
+  test('Should update settings correctly', () => {
+    // Set up API mock
     api.fetchAvailableTools.mockResolvedValueOnce({ tools: [] });
     
-    // 初始化应用
+    // Initialize application
     mainModule.initApp();
     
-    // 调用更新设置函数
+    // Call update settings function
     mainModule.updateSetting('temperature', 0.7);
     
-    // 验证UI更新
+    // Verify UI update
     const tempValue = document.getElementById('temp-value');
     expect(tempValue.textContent).toBe('0.7');
   });

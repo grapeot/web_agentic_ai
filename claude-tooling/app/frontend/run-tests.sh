@@ -1,30 +1,30 @@
 #!/bin/bash
 
-# 切换到前端目录
+# Change to frontend directory
 cd "$(dirname "$0")"
 
-# 检查是否安装了npm
+# Check if npm is installed
 if ! command -v npm &> /dev/null; then
-    echo "请先安装npm和Node.js"
+    echo "Please install npm and Node.js first"
     exit 1
 fi
 
-# 检查是否安装了依赖
+# Check if dependencies are installed
 if [ ! -d "node_modules" ]; then
-    echo "正在安装依赖..."
+    echo "Installing dependencies..."
     npm install
 fi
 
-# 运行测试
-echo "正在运行测试..."
+# Run tests
+echo "Running tests..."
 npm test
 
-# 输出测试结果状态
+# Output test result status
 TEST_STATUS=$?
 if [ $TEST_STATUS -eq 0 ]; then
-    echo "✅ 所有测试通过!"
+    echo "✅ All tests passed!"
 else
-    echo "❌ 测试失败，请检查错误信息"
+    echo "❌ Tests failed, please check error messages"
 fi
 
 exit $TEST_STATUS 

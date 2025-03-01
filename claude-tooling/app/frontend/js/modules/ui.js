@@ -2,6 +2,7 @@
  * UI 模块 - 处理DOM操作和界面渲染
  */
 import * as config from './config.js';
+import * as state from './state.js';
 const ROLES = config.ROLES;
 const TOOL_DISPLAY = config.TOOL_DISPLAY;
 const MESSAGE_TYPES = config.MESSAGE_TYPES;
@@ -582,32 +583,47 @@ function displayHtmlPreview(url, container) {
 }
 
 /**
- * 显示可用工具列表
- * @param {Array} tools - 工具列表
+ * Setup toggle functionality for tool call UI
+ * @param {HTMLElement} toolCallDiv - Tool call element
  */
-function displayTools(tools) {
-  if (!elements.toolsGroup) return;
+function setupToolCallToggle(toolCallDiv) {
+  const header = toolCallDiv.querySelector('.tool-call-header');
+  const content = toolCallDiv.querySelector('.tool-content');
+  const toggle = toolCallDiv.querySelector('.toggle-arrow');
   
-  // 清空现有工具列表
-  elements.toolsGroup.innerHTML = '';
-  
-  // 为每个工具创建列表项
-  tools.forEach(tool => {
-    const li = document.createElement('li');
-    li.className = 'tool-item';
+  if (header && content && toggle) {
+    header.addEventListener('click', function() {
+      const isCollapsed = content.style.display === 'none';
+      content.style.display = isCollapsed ? 'block' : 'none';
+      toggle.innerHTML = isCollapsed ? TOOL_DISPLAY.COLLAPSE_ARROW : TOOL_DISPLAY.EXPAND_ARROW;
+    });
+  }
+}
+
+/**
+ * Render available tools
+ * @param {Array} tools - Array of tool objects
+ */
+function renderTools(tools) {
+    const toolsList = elements.toolsGroup;
+    toolsList.innerHTML = '';
     
-    const toolName = document.createElement('div');
-    toolName.className = 'tool-name';
-    toolName.textContent = tool.name;
-    
-    const toolDesc = document.createElement('div');
-    toolDesc.className = 'tool-description';
-    toolDesc.textContent = tool.description || '无描述';
-    
-    li.appendChild(toolName);
-    li.appendChild(toolDesc);
-    elements.toolsGroup.appendChild(li);
-  });
+    tools.forEach(tool => {
+        const li = document.createElement('li');
+        li.className = 'tool-item';
+        
+        const nameElement = document.createElement('div');
+        nameElement.className = 'tool-name';
+        nameElement.textContent = tool.name;
+        
+        const descriptionElement = document.createElement('div');
+        descriptionElement.className = 'tool-description';
+        descriptionElement.textContent = tool.description || 'No description';
+        
+        li.appendChild(nameElement);
+        li.appendChild(descriptionElement);
+        toolsList.appendChild(li);
+    });
 }
 
 /**
@@ -645,6 +661,7 @@ export {
   addToolResultToChat,
   fetchAndDisplayMarkdown,
   displayHtmlPreview,
-  displayTools,
-  escapeHtml
+  renderTools,
+  escapeHtml,
+  setupToolCallToggle
 }; 
