@@ -24,7 +24,7 @@ class StateManager {
     // 工具状态
     this.currentToolUseId = null;
     this.waitingForToolResult = false;
-    this.isAutoExecutingTools = false;
+    this.autoExecutingTools = false;
     this.pollingInterval = null;
     this.lastToolCallId = null;
     
@@ -120,7 +120,7 @@ class StateManager {
    * @param {boolean} auto - 是否自动执行工具
    */
   setAutoExecutingTools(auto) {
-    this.isAutoExecutingTools = auto;
+    this.autoExecutingTools = auto;
   }
   
   /**
@@ -128,7 +128,7 @@ class StateManager {
    * @returns {boolean} 是否自动执行工具
    */
   isAutoExecutingTools() {
-    return this.isAutoExecutingTools;
+    return this.autoExecutingTools;
   }
   
   /**
