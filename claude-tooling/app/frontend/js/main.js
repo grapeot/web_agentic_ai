@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', () => {
     // Elements
     const chatMessages = document.getElementById('chat-messages');
     const userInput = document.getElementById('user-input');
@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', function() {
         budgetValue.textContent = this.value;
     });
     
-    clearChatButton.addEventListener('click', function() {
+    clearChatButton.addEventListener('click', () => {
         chatMessages.innerHTML = '';
         messages = [];
         conversationId = null;
@@ -67,14 +67,14 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     sendButton.addEventListener('click', sendMessage);
-    userInput.addEventListener('keydown', function(e) {
+    userInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendMessage();
         }
     });
     
-    submitToolResultButton.addEventListener('click', function() {
+    submitToolResultButton.addEventListener('click', () => {
         const toolResult = toolResultTextarea.value;
         if (toolResult && currentToolUseId) {
             submitToolResult(currentToolUseId, toolResult);
@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Add cancel auto-execution event listener
-    cancelAutoExecutionButton.addEventListener('click', function() {
+    cancelAutoExecutionButton.addEventListener('click', () => {
         if (isAutoExecutingTools) {
             isAutoExecutingTools = false;
             if (pollingInterval) {
@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Add event delegation for chat messages area to handle collapsible tool calls
-    chatMessages.addEventListener('click', function(e) {
+    chatMessages.addEventListener('click', (e) => {
         // Find the closest tool call header element
         const toolHeader = e.target.closest('.tool-call-header');
         if (toolHeader) {
@@ -152,7 +152,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    function sendMessage() {
+    async function sendMessage() {
         const message = userInput.value.trim();
         if (!message) return;
         
@@ -170,16 +170,16 @@ document.addEventListener('DOMContentLoaded', function() {
         
         responseSpinner.style.display = 'block';
         
-        // 基础API端点
+        // Base API endpoint
         let apiEndpoint = `${API_URL}/api/chat`;
         
-        // 如果有会话ID，通过URL参数传递
+        // If conversation ID exists, pass it as URL parameter
         if (conversationId) {
             apiEndpoint += `?conversation_id=${encodeURIComponent(conversationId)}`;
-            console.log("Continuing conversation:", conversationId);
+            console.log(`Continuing conversation: ${conversationId}`);
         }
         
-        let requestOptions = {
+        const requestOptions = {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -187,9 +187,10 @@ document.addEventListener('DOMContentLoaded', function() {
             body: JSON.stringify(requestBody)
         };
         
-        fetch(apiEndpoint, requestOptions)
-        .then(response => response.json())
-        .then(data => {
+        try {
+            const response = await fetch(apiEndpoint, requestOptions);
+            const data = await response.json();
+            
             responseSpinner.style.display = 'none';
             
             if (data.conversation_id) {
@@ -228,14 +229,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 isAutoExecutingTools = true;
                 startPollingForUpdates();
             }
-        })
-        .catch(error => {
+        } catch (error) {
             responseSpinner.style.display = 'none';
             console.error('Error sending message:', error);
-        });
+        }
     }
     
-    function submitToolResult(toolUseId, result) {
+    async function submitToolResult(toolUseId, result) {
         addToolResultToChat(result, toolUseId);
         
         const requestBody = {
@@ -244,15 +244,17 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         responseSpinner.style.display = 'block';
-        fetch(`${API_URL}/api/tool-results?conversation_id=${conversationId}&auto_execute_tools=${autoExecuteToolsSwitch.checked}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(requestBody)
-        })
-        .then(response => response.json())
-        .then(data => {
+        
+        try {
+            const response = await fetch(`${API_URL}/api/tool-results?conversation_id=${conversationId}&auto_execute_tools=${autoExecuteToolsSwitch.checked}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
+            
+            const data = await response.json();
             responseSpinner.style.display = 'none';
             
             processAssistantMessage(data.message.content);
@@ -282,11 +284,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     startPollingForUpdates();
                 }
             }
-        })
-        .catch(error => {
+        } catch (error) {
             responseSpinner.style.display = 'none';
             console.error('Error submitting tool result:', error);
-        });
+        }
     }
     
     function buildMessagesForAPI(userMessage) {
@@ -751,7 +752,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Add functions to fetch and display file content
-    function fetchAndDisplayMarkdown(url, container) {
+    async function fetchAndDisplayMarkdown(url, container) {
         const previewContainer = document.createElement('div');
         previewContainer.className = 'markdown-content-preview';
         previewContainer.innerHTML = '<div class="preview-loading"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
@@ -764,41 +765,41 @@ document.addEventListener('DOMContentLoaded', function() {
             container.appendChild(previewContainer);
         }
         
-        // Fetch the markdown content
-        fetch(url)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.text();
-            })
-            .then(markdown => {
-                // Render markdown
-                previewContainer.innerHTML = `
-                    <div class="markdown-preview-header">
-                        <button class="btn btn-sm btn-outline-secondary close-preview">
-                            <i class="fas fa-times"></i> Close Preview
-                        </button>
-                    </div>
-                    <div class="markdown-preview-content">${marked.parse(markdown)}</div>
-                `;
-                
-                // Add close button functionality
-                const closeBtn = previewContainer.querySelector('.close-preview');
-                if (closeBtn) {
-                    closeBtn.addEventListener('click', function() {
-                        previewContainer.remove();
-                    });
-                }
-                
-                // Apply syntax highlighting to code blocks
-                previewContainer.querySelectorAll('pre code').forEach((block) => {
-                    hljs.highlightBlock(block);
+        try {
+            // Fetch the markdown content
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            
+            const markdown = await response.text();
+            
+            // Render markdown
+            previewContainer.innerHTML = `
+                <div class="markdown-preview-header">
+                    <button class="btn btn-sm btn-outline-secondary close-preview">
+                        <i class="fas fa-times"></i> Close Preview
+                    </button>
+                </div>
+                <div class="markdown-preview-content">${marked.parse(markdown)}</div>
+            `;
+            
+            // Add close button functionality
+            const closeBtn = previewContainer.querySelector('.close-preview');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                    previewContainer.remove();
                 });
-            })
-            .catch(error => {
-                previewContainer.innerHTML = `<div class="alert alert-danger">Error loading Markdown: ${error.message}</div>`;
+            }
+            
+            // Apply syntax highlighting to code blocks
+            previewContainer.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightBlock(block);
             });
+        } catch (error) {
+            previewContainer.innerHTML = `<div class="alert alert-danger">Error loading Markdown: ${error.message}</div>`;
+        }
     }
     
     function displayHtmlPreview(url, container) {
@@ -831,7 +832,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Add close button functionality
         const closeBtn = previewContainer.querySelector('.close-preview');
         if (closeBtn) {
-            closeBtn.addEventListener('click', function() {
+            closeBtn.addEventListener('click', () => {
                 previewContainer.remove();
             });
         }
@@ -859,38 +860,38 @@ document.addEventListener('DOMContentLoaded', function() {
         
         autoExecutionIndicator.style.display = 'block';
         
-        pollingInterval = setInterval(() => {
+        pollingInterval = setInterval(async () => {
             if (!isAutoExecutingTools) {
                 clearInterval(pollingInterval);
                 autoExecutionIndicator.style.display = 'none';
                 return;
             }
             
-            fetch(`${API_URL}/api/conversation/${conversationId}/messages`)
-                .then(response => {
-                    if (!response.ok) {
-                        if (response.status === 404) {
-                            return null;
-                        }
-                        throw new Error(`HTTP error! status: ${response.status}`);
+            try {
+                const response = await fetch(`${API_URL}/api/conversation/${conversationId}/messages`);
+                
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        return null;
                     }
-                    return response.json();
-                })
-                .then(data => {
-                    if (data && data.messages && data.messages.length > 0) {
-                        updateChatWithNewMessages(data.messages);
-                        
-                        // Even when conversation is marked as complete,
-                        // we keep isAutoExecutingTools true to allow continued interaction
-                        if (data.status === "completed") {
-                            clearInterval(pollingInterval);
-                            autoExecutionIndicator.style.display = 'none';
-                        }
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data && data.messages && data.messages.length > 0) {
+                    updateChatWithNewMessages(data.messages);
+                    
+                    // Even when conversation is marked as complete,
+                    // we keep isAutoExecutingTools true to allow continued interaction
+                    if (data.status === "completed") {
+                        clearInterval(pollingInterval);
+                        autoExecutionIndicator.style.display = 'none';
                     }
-                })
-                .catch(error => {
-                    console.error("Error polling for updates:", error);
-                });
+                }
+            } catch (error) {
+                console.error("Error polling for updates:", error);
+            }
         }, 5000);
     }
     
