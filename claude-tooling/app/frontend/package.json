@@ -1,0 +1,14 @@
+{
+  "name": "claude-tooling-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for Claude Tooling App",
+  "main": "js/main.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "whatwg-fetch": "^3.6.20"
+  }
+} 
