@@ -1,4 +1,7 @@
-export default {
+/** @jest-environment jsdom */
+// This file is treated as CommonJS despite package.json type:module
+
+module.exports = {
   testEnvironment: 'jsdom',
   moduleDirectories: ['node_modules'],
   // Setup jsdom test environment
@@ -11,13 +14,15 @@ export default {
   testMatch: ['**/tests/**/*.test.js'],
   // Coverage collection
   collectCoverage: true,
-  collectCoverageFrom: ['js/**/*.js', '!js/tests/**'],
+  collectCoverageFrom: ['**/js/**/*.js', '!**/node_modules/**', '!**/tests/**'],
   // Support for ES modules
   transform: {
-    "^.+\\.js$": "babel-jest"
+    '^.+\\.js$': 'babel-jest'
   },
   // Use fake-timers
-  timers: 'fake',
+  fakeTimers: {
+    enableGlobally: true
+  },
   // Add ES module support
   extensionsToTreatAsEsm: ['.js'],
   moduleNameMapper: {

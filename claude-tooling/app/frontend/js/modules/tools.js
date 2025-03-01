@@ -9,6 +9,9 @@ import { state } from './state.js';
 import * as ui from './ui.js';
 import * as api from './api.js';
 
+// Track processed message IDs to prevent duplication
+const processedMessageIds = new Set();
+
 /**
  * Process assistant message content
  * @param {Array} content - Message content array
@@ -157,6 +160,16 @@ function updateChatWithNewMessages(newMessages) {
   
   // Process messages
   for (const message of newMessages) {
+    // Skip already processed messages to avoid duplication
+    if (message.id && processedMessageIds.has(message.id)) {
+      continue;
+    }
+    
+    // Mark message as processed
+    if (message.id) {
+      processedMessageIds.add(message.id);
+    }
+    
     if (message.role === ROLES.ASSISTANT && message.content) {
       // Assistant message processing
       const toolCalls = [];

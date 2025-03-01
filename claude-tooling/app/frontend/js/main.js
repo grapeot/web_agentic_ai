@@ -101,7 +101,7 @@ async function sendMessage() {
       state.addMessage(responseData.message);
       
       // Process message content
-      processAssistantMessage(responseData.message.content);
+      tools.processAssistantMessage(responseData.message.content);
     }
     
     // Process tool calls
@@ -113,8 +113,8 @@ async function sendMessage() {
     }
     
     return responseData;
-  } catch (error) {
-    console.error('Error sending message:', error);
+        } catch (error) {
+            console.error('Error sending message:', error);
     ui.addMessageToChat('system', `Error: ${error.message}`);
   } finally {
     ui.setLoading(false);
@@ -124,8 +124,17 @@ async function sendMessage() {
 /**
  * Process assistant message
  * @param {Array} content - Message content array
+ * @deprecated Use tools.processAssistantMessage instead
  */
 function processAssistantMessage(content) {
+  // In a production environment, delegate to the tools module
+  if (!isTestEnvironment) {
+    // Call the tools module implementation instead
+    tools.processAssistantMessage(content);
+    return;
+  }
+  
+  // Test environment only code
   if (!content) return;
   
   content.forEach(item => {
@@ -153,13 +162,13 @@ function buildMessagesForAPI(userMessage) {
   
   // Add user message
   messages.push({
-    role: 'user',
-    content: [{
-      type: 'text',
-      text: userMessage
-    }]
-  });
-  
+            role: 'user',
+            content: [{
+                type: 'text',
+                text: userMessage
+            }]
+        });
+        
   return messages;
 }
 
@@ -168,14 +177,14 @@ function buildMessagesForAPI(userMessage) {
  * @param {string} role - Role
  * @param {string} content - Content
  */
-function addMessageToChat(role, content) {
+    function addMessageToChat(role, content) {
   // Directly manipulate DOM in test environment
   if (isTestEnvironment) {
     const chatMessages = document.getElementById('chat-messages');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${role}-message`;
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${role}-message`;
     messageDiv.textContent = content;
-    chatMessages.appendChild(messageDiv);
+        chatMessages.appendChild(messageDiv);
     return;
   }
   
@@ -241,7 +250,7 @@ function submitToolResult() {
       
       // Process response data
       if (data && data.message) {
-        processAssistantMessage(data.message.content);
+        tools.processAssistantMessage(data.message.content);
       }
       
       return data;

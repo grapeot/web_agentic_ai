@@ -47,8 +47,8 @@ const DEFAULT_SETTINGS = {
  */
 const TOOL_DISPLAY = {
   INITIAL_COLLAPSED: true,  // 工具调用默认折叠
-  EXPAND_ARROW: '&#9660;',  // 展开箭头Unicode
-  COLLAPSE_ARROW: '&#9654;' // 折叠箭头Unicode
+  EXPAND_ARROW: '&#9654;',  // 展开箭头Unicode (▶)
+  COLLAPSE_ARROW: '&#9660;' // 折叠箭头Unicode (▼)
 };
 
 /**

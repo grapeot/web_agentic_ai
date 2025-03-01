@@ -2,7 +2,7 @@
  * UI 模块 - 处理DOM操作和界面渲染
  */
 import * as config from './config.js';
-import * as state from './state.js';
+import { state } from './state.js';
 const ROLES = config.ROLES;
 const TOOL_DISPLAY = config.TOOL_DISPLAY;
 const MESSAGE_TYPES = config.MESSAGE_TYPES;
@@ -206,13 +206,13 @@ function addToolCallToChat(toolCall) {
   // Format tool input as JSON
   const formattedInput = JSON.stringify(toolCall.input, null, 2);
   
-  // Create tool call content
+  // Create tool call content with content initially collapsed
   const toolCallHtml = `
     <div class="tool-call-header">
-      <span class="toggle-arrow">${TOOL_DISPLAY.COLLAPSE_ARROW}</span>
+      <span class="toggle-arrow">${TOOL_DISPLAY.EXPAND_ARROW}</span>
       <strong>${toolCall.name}</strong>
     </div>
-    <div class="tool-content">
+    <div class="tool-content" style="display: none;">
       <div class="tool-section-label">Input:</div>
       <pre class="tool-input"><code class="language-json">${escapeHtml(formattedInput)}</code></pre>
     </div>
@@ -238,19 +238,42 @@ function addToolCallToChat(toolCall) {
   // Scroll to bottom
   elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
   
+  // Debug state object
+  console.log('State object in addToolCallToChat:', state);
+  
   // Show tool result modal if auto-execute is disabled
-  const settings = state.getSettings();
-  if (!settings.autoExecuteTools) {
-    state.setCurrentToolUseId(toolCall.id);
-    state.setWaitingForToolResult(true);
+  try {
+    if (typeof state.getSettings === 'function') {
+      const settings = state.getSettings();
+      if (!settings.autoExecuteTools) {
+        state.setCurrentToolUseId(toolCall.id);
+        state.setWaitingForToolResult(true);
+        showToolResultModal();
+      }
+    } else {
+      console.error('state.getSettings is not a function:', state);
+      // Fallback behavior - always show tool result modal
+      state.setCurrentToolUseId(toolCall.id);
+      state.setWaitingForToolResult(true);
+      showToolResultModal();
+    }
+  } catch (e) {
+    console.error('Error getting settings:', e);
+    // Fallback behavior - always show tool result modal
+    if (typeof state.setCurrentToolUseId === 'function') {
+      state.setCurrentToolUseId(toolCall.id);
+    }
+    if (typeof state.setWaitingForToolResult === 'function') {
+      state.setWaitingForToolResult(true);
+    }
     showToolResultModal();
   }
 }
 
 /**
- * 添加工具结果到聊天界面
- * @param {string} result - 工具结果
- * @param {string} toolUseId - 工具使用ID
+ * Add tool result to chat
+ * @param {Object|string} result - Result object or string
+ * @param {string} toolUseId - Tool use ID
  */
 function addToolResultToChat(result, toolUseId) {
   if (!elements.chatMessages) return;
@@ -258,6 +281,12 @@ function addToolResultToChat(result, toolUseId) {
   // 查找对应的工具调用
   const toolCallDiv = document.querySelector(`.tool-call[data-tool-use-id="${toolUseId}"]`);
   if (!toolCallDiv) return;
+  
+  // Check if result already exists to prevent duplication
+  if (toolCallDiv.querySelector('.tool-result')) {
+    console.log(`Result for tool ${toolUseId} already displayed, skipping duplicate`);
+    return;
+  }
   
   // 查找状态标签
   const statusLabel = toolCallDiv.querySelector('.tool-status');
@@ -309,13 +338,13 @@ function processToolResult(container, result) {
   // 格式化JSON结果
   const formattedResult = JSON.stringify(result, null, 2);
   
-  // 构建结果UI
+  // 构建结果UI with content initially collapsed
   let resultHtml = `
     <div class="result-header">
-      <span class="result-toggle">${TOOL_DISPLAY.COLLAPSE_ARROW}</span>
+      <span class="result-toggle">${TOOL_DISPLAY.EXPAND_ARROW}</span>
       <strong>Tool Result</strong>
     </div>
-    <div class="result-content">
+    <div class="result-content" style="display: none;">
       <pre class="result-json">${escapeHtml(formattedResult)}</pre>
     </div>
   `;

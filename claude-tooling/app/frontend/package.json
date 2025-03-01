@@ -5,7 +5,7 @@
   "main": "js/main.js",
   "type": "module",
   "scripts": {
-    "test": "jest"
+    "test": "jest --config=jest.config.cjs"
   },
   "devDependencies": {
     "@babel/core": "^7.22.5",
