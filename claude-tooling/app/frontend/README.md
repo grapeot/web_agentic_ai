@@ -38,15 +38,76 @@ js/
   - [x] 创建tools.js：工具功能
   - [x] 创建filePreview.js：文件预览
   - [x] 创建utils.js：辅助函数
-- [ ] 更新main.js入口点
+- [x] 更新main.js入口点
+- [x] 转换为ES模块格式
 - [ ] 运行测试验证功能正确性
 - [ ] 补充完整文档
 
+## ES模块转换
+
+为了确保代码在浏览器中正常运行，我们将所有模块从CommonJS格式转换为ES模块格式：
+
+### 转换内容
+
+1. 将所有`require()`语句转换为`import`语句
+2. 将`module.exports`转换为`export {}`语句
+3. 在HTML中添加`type="module"`属性到脚本标签
+4. 更新测试环境兼容性逻辑
+
+### 设计决策
+
+1. **测试环境兼容性**：为了保持测试与浏览器环境的兼容性，我们用条件检测代替了直接的CommonJS导出：
+   ```javascript
+   // 为了在测试环境中兼容CommonJS
+   if (isTestEnvironment) {
+     window.testExports = {
+       // 导出函数
+     };
+   }
+   ```
+
+2. **模块依赖关系**：确保模块间依赖清晰，避免循环依赖
+   - config.js 无依赖
+   - state.js 依赖 config.js
+   - api.js 依赖 config.js
+   - ui.js 依赖 config.js
+   - events.js 依赖 state.js, ui.js, api.js, tools.js
+   - tools.js 依赖 config.js, state.js, ui.js, api.js
+   - filePreview.js 无外部依赖
+   - utils.js 无外部依赖
+   - main.js 依赖所有模块
+
+3. **初始化流程**：通过main.js中的initApp函数协调模块初始化顺序
+   - 首先初始化UI
+   - 然后设置事件监听器
+   - 最后获取可用工具列表
+
+## 学习内容
+
+1. **ES模块与CommonJS的区别**：
+   - ES模块默认是静态的，导入发生在解析阶段
+   - CommonJS是动态的，导入发生在运行时
+   - ES模块支持顶级await，CommonJS不支持
+   - ES模块有更好的树摇（tree-shaking）支持
+
+2. **浏览器中的模块加载**：
+   - 浏览器通过`type="module"`属性识别ES模块
+   - 模块脚本默认延迟加载（类似defer）
+   - 模块导入使用CORS加载
+   - 模块只加载和执行一次
+
+3. **测试兼容性**：
+   - 测试环境（Node.js）和浏览器环境对模块处理有差异
+   - 需要适配两种环境，保持代码一致性
+   - Jest测试框架主要支持CommonJS模块
+
 ## 下一步计划
 
-1. **保持main.js功能不变**：首先确保测试能够通过
-2. **逐步替换实现**：在测试通过后，逐步用模块化实现替换原有代码
-3. **增量测试**：每完成一部分替换就运行测试确保功能正常
+1. **测试全面性**：确保所有功能都有测试覆盖
+2. **逐步验证功能**：每个模块分别验证功能正确性
+3. **优化模块结构**：基于测试反馈调整模块设计
+4. **完善错误处理**：增强每个模块的错误处理和恢复能力
+5. **文档补充**：为所有公共API添加详细文档
 
 ## 测试设置
 
