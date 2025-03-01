@@ -1,5 +1,5 @@
 // 导入fetch polyfill
-require('whatwg-fetch');
+import 'whatwg-fetch';
 
 // 模拟localStorage
 global.localStorage = {
@@ -37,7 +37,11 @@ global.marked = {
 
 // 模拟highlight.js
 global.hljs = {
-  highlightBlock: jest.fn()
+  highlightBlock: jest.fn(),
+  highlightElement: jest.fn(),
+  highlight: jest.fn().mockReturnValue({ value: '' }),
+  getLanguage: jest.fn().mockReturnValue(true),
+  highlightAuto: jest.fn().mockReturnValue({ value: '' })
 };
 
 // 创建DOM元素mock辅助方法

@@ -11,5 +11,16 @@ module.exports = {
   testMatch: ['**/tests/**/*.test.js'],
   // 覆盖率收集
   collectCoverage: true,
-  collectCoverageFrom: ['js/**/*.js', '!js/tests/**']
+  collectCoverageFrom: ['js/**/*.js', '!js/tests/**'],
+  // 支持ES模块
+  transform: {
+    "^.+\\.js$": "babel-jest"
+  },
+  // 使用fake-timers
+  timers: 'fake',
+  // 添加ES模块支持
+  extensionsToTreatAsEsm: ['.js'],
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1'
+  }
 }; 

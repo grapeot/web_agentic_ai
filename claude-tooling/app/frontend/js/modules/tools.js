@@ -1,5 +1,5 @@
 /**
- * 工具处理模块 - 处理工具调用和自动执行
+ * Tools Module - Handle tool calls and auto-execution
  */
 import * as config from './config.js';
 const POLLING_INTERVAL = config.POLLING_INTERVAL;
@@ -10,8 +10,8 @@ import * as ui from './ui.js';
 import * as api from './api.js';
 
 /**
- * 处理助手消息内容
- * @param {Array} content - 消息内容数组
+ * Process assistant message content
+ * @param {Array} content - Message content array
  */
 function processAssistantMessage(content) {
   if (!content || !Array.isArray(content)) {
@@ -22,7 +22,7 @@ function processAssistantMessage(content) {
   let textContent = '';
   let toolCalls = [];
   
-  // 获取已显示的工具ID，避免重复显示
+  // Get displayed tool IDs to avoid duplicate display
   const displayedToolIds = new Set();
   document.querySelectorAll('.tool-call').forEach(el => {
     if (el.dataset.toolUseId) {
@@ -30,60 +30,76 @@ function processAssistantMessage(content) {
     }
   });
   
-  // 处理消息内容
+  // Process message content
   content.forEach(item => {
     if (item.type === MESSAGE_TYPES.TEXT) {
-      // 文本消息
+      // Text message
       textContent += item.text;
     } else if (item.type === MESSAGE_TYPES.TOOL_USE && !displayedToolIds.has(item.id)) {
-      // 工具调用
+      // Tool call
       toolCalls.push({
         id: item.id,
         name: item.name,
         input: item.input
       });
       
-      // 记录最后一个工具调用ID
+      // Record last tool call ID
       state.setLastToolCallId(item.id);
+      
+      // Auto-execute if enabled
+      if (state.getSettings().autoExecuteTools) {
+        // Set state for auto-execution
+        state.setCurrentToolUseId(item.id);
+        state.setAutoExecutingTools(true);
+        
+        // Start polling for updates
+        startPollingForUpdates();
+      }
     }
   });
   
-  // 显示文本消息
+  // Display text message
   if (textContent) {
     ui.addMessageToChat(ROLES.ASSISTANT, textContent);
   }
   
-  // 显示工具调用
+  // Display tool calls
   toolCalls.forEach(toolCall => {
     ui.addToolCallToChat(toolCall);
+    
+    // Start auto-execution if enabled
+    if (state.getSettings().autoExecuteTools && toolCall.id) {
+      console.log('Auto-executing tool call:', toolCall.name);
+      ui.setAutoExecutionIndicator(true);
+    }
   });
 }
 
 /**
- * 开始轮询更新
- * 在启用自动执行工具时使用
+ * Start polling for updates
+ * Used for auto-executing tools
  */
 function startPollingForUpdates() {
-  // 停止任何现有轮询
+  // Stop any existing polling
   const existingInterval = state.getPollingInterval();
   if (existingInterval) {
     clearInterval(existingInterval);
   }
   
-  // 检查是否启用自动执行
+  // Check if auto-execution is enabled
   if (!state.getSettings().autoExecuteTools) {
-    console.log('自动执行工具已禁用，不启动轮询');
+    console.log('Auto-execute tools disabled, not starting polling');
     return;
   }
   
-  // 设置自动执行状态
+  // Set auto-execution state
   state.setAutoExecutingTools(true);
   ui.setAutoExecutionIndicator(true);
   
-  // 创建轮询间隔
+  // Create polling interval
   const intervalId = setInterval(async () => {
     try {
-      // 检查是否应继续轮询
+      // Check if should continue polling
       if (!state.isAutoExecutingTools() || !state.getConversationId()) {
         clearInterval(intervalId);
         state.setPollingInterval(null);
@@ -91,70 +107,70 @@ function startPollingForUpdates() {
         return;
       }
       
-      // 获取更新
+      // Get updates
       const updates = await api.getConversationUpdates(state.getConversationId());
       
       if (!updates) {
-        console.log('未收到更新或会话不存在');
+        console.log('No updates received or conversation does not exist');
         return;
       }
       
-      // 处理新消息
+      // Process new messages
       if (updates.messages && updates.messages.length > 0) {
         updateChatWithNewMessages(updates.messages);
       }
       
-      // 检查是否完成
+      // Check if completed
       if (updates.completed) {
-        console.log('会话已完成，停止轮询');
+        console.log('Conversation completed, stopping polling');
         clearInterval(intervalId);
         state.setPollingInterval(null);
         state.setAutoExecutingTools(false);
         ui.setAutoExecutionIndicator(false);
       }
     } catch (error) {
-      console.error('轮询更新错误:', error);
+      console.error('Error polling for updates:', error);
     }
   }, POLLING_INTERVAL);
   
-  // 保存轮询间隔ID
+  // Save polling interval ID
   state.setPollingInterval(intervalId);
   
-  console.log('开始轮询会话更新');
+  console.log('Started polling for conversation updates');
 }
 
 /**
- * 处理更新中的新消息
- * @param {Array} newMessages - 新消息数组
+ * Process new messages in updates
+ * @param {Array} newMessages - New messages array
  * @private
  */
 function updateChatWithNewMessages(newMessages) {
   if (!Array.isArray(newMessages) || newMessages.length === 0) return;
   
-  // 跟踪未处理的工具结果
+  // Track pending tool results
   let pendingToolResults = new Map();
   
-  // 查找上次处理的工具调用ID
+  // Find last handled tool call ID
   const lastHandledToolId = state.getLastToolCallId();
-  let foundLastHandled = !lastHandledToolId; // 如果没有上次处理的ID，视为已找到
+  let foundLastHandled = !lastHandledToolId; // If no last ID, consider it found
   let hasNewToolCalls = false;
   
-  // 处理消息
+  // Process messages
   for (const message of newMessages) {
     if (message.role === ROLES.ASSISTANT && message.content) {
-      // 助手消息处理
+      // Assistant message processing
       const toolCalls = [];
       let textContent = '';
       
-      // 处理消息内容
+      // Process message content
       for (const item of message.content) {
         if (item.type === MESSAGE_TYPES.TEXT) {
           textContent += item.text;
         } else if (item.type === MESSAGE_TYPES.TOOL_USE) {
-          // 检查是否是新的工具调用
+          // Check if it's a new tool call
           if (lastHandledToolId === item.id) {
             foundLastHandled = true;
-            continue; // 跳过已处理的工具调用
+            continue; // Skip already handled tool call
           }
           
           if (foundLastHandled) {
@@ -166,11 +182,16 @@ function updateChatWithNewMessages(newMessages) {
             
             hasNewToolCalls = true;
             state.setLastToolCallId(item.id);
+            
+            // Auto-execute new tool call if enabled
+            if (state.getSettings().autoExecuteTools) {
+              state.setCurrentToolUseId(item.id);
+            }
           }
         }
       }
       
-      // 显示文本和工具调用
+      // Display text and tool calls
       if (textContent && foundLastHandled) {
         ui.addMessageToChat(ROLES.ASSISTANT, textContent);
       }
@@ -179,10 +200,10 @@ function updateChatWithNewMessages(newMessages) {
         ui.addToolCallToChat(toolCall);
       }
       
-      // 添加消息到状态
+      // Add message to state
       state.addMessage(message);
     } else if (message.role === ROLES.USER && message.content) {
-      // 用户消息处理 - 查找工具结果
+      // User message processing - find tool results
       for (const item of message.content) {
         if (item.type === MESSAGE_TYPES.TOOL_RESULT && item.tool_use_id) {
           pendingToolResults.set(item.tool_use_id, item.content);
@@ -191,16 +212,16 @@ function updateChatWithNewMessages(newMessages) {
     }
   }
   
-  // 处理工具结果
+  // Process tool results
   pendingToolResults.forEach((result, toolUseId) => {
     ui.addToolResultToChat(result, toolUseId);
   });
   
-  // 更新自动执行指示器
+  // Update auto-execution indicator
   if (hasNewToolCalls) {
     ui.setAutoExecutionIndicator(true);
   } else if (pendingToolResults.size > 0 && !hasNewToolCalls) {
-    // 如果有结果但没有新工具调用，可能是对话结束
+    // If there are results but no new tool calls, conversation might be ending
     state.setAutoExecutingTools(false);
     ui.setAutoExecutionIndicator(false);
   }

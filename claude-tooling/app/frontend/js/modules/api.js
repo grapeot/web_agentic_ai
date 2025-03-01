@@ -4,12 +4,26 @@
 import * as config from './config.js';
 
 /**
+ * 构建API路径
+ * @param {string} endpoint - API端点路径
+ * @returns {string} 完整的API URL
+ */
+function buildApiUrl(endpoint) {
+  // 如果config.API_URL为空，则使用相对路径
+  if (!config.API_URL) {
+    return endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  }
+  // 否则使用完整URL
+  return `${config.API_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+}
+
+/**
  * 获取可用工具列表
  * @returns {Promise<Object>} 包含工具列表的响应
  */
 async function fetchAvailableTools() {
   try {
-    const response = await fetch(`${config.API_URL}/api/tools`);
+    const response = await fetch(buildApiUrl('/api/tools'));
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -38,7 +52,7 @@ async function sendMessage(messages, settings, conversationId = null) {
   };
   
   // 构建API端点
-  let apiEndpoint = `${config.API_URL}/api/chat`;
+  let apiEndpoint = '/api/chat';
   
   // 如果存在对话ID，添加为URL参数
   if (conversationId) {
@@ -46,7 +60,7 @@ async function sendMessage(messages, settings, conversationId = null) {
   }
   
   try {
-    const response = await fetch(apiEndpoint, {
+    const response = await fetch(buildApiUrl(apiEndpoint), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -80,8 +94,9 @@ async function submitToolResult(toolUseId, result, conversationId, autoExecuteTo
   };
   
   try {
+    const apiEndpoint = `/api/tool-results?conversation_id=${conversationId}&auto_execute_tools=${autoExecuteTools}`;
     const response = await fetch(
-      `${config.API_URL}/api/tool-results?conversation_id=${conversationId}&auto_execute_tools=${autoExecuteTools}`, 
+      buildApiUrl(apiEndpoint),
       {
         method: 'POST',
         headers: {
@@ -109,7 +124,8 @@ async function submitToolResult(toolUseId, result, conversationId, autoExecuteTo
  */
 async function getConversationUpdates(conversationId) {
   try {
-    const response = await fetch(`${config.API_URL}/api/conversation/${conversationId}/messages`);
+    const apiEndpoint = `/api/conversation/${conversationId}/messages`;
+    const response = await fetch(buildApiUrl(apiEndpoint));
     
     if (!response.ok) {
       if (response.status === 404) {

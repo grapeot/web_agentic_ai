@@ -16,6 +16,28 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/styles.css">
+    
+    <!-- API Configuration -->
+    <script type="text/javascript">
+        // Set API Base URL - Detect environment and configure the correct API URL
+        window.API_BASE_URL = (() => {
+            // If accessed under FastAPI's /frontend path, use the same origin
+            if (window.location.pathname.startsWith('/frontend/')) {
+                return window.location.origin;
+            }
+            
+            // Local development environment - use localhost:8000
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                const backendPort = 8000; // Default port for the backend service
+                return `${window.location.protocol}//${window.location.hostname}:${backendPort}`;
+            }
+            
+            // Other environments (production) default to the same origin
+            return window.location.origin;
+        })();
+        
+        console.log('API Base URL configured as:', window.API_BASE_URL);
+    </script>
 </head>
 <body>
     <div class="container-fluid">

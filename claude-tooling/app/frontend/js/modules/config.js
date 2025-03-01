@@ -4,9 +4,25 @@
 
 /**
  * API端点配置
- * 将API端点动态获取
+ * 动态检测API端点
  */
-const API_URL = window.location.origin;
+// 更灵活的API URL检测
+const API_URL = (() => {
+  // 检查是否存在环境变量或全局配置
+  if (window.API_BASE_URL) {
+    return window.API_BASE_URL;
+  }
+
+  // 如果在同一域名下访问前端和API（由FastAPI的mount静态文件提供）
+  if (window.location.pathname.startsWith('/frontend/')) {
+    // 使用相同的origin，但路径不带/frontend
+    return window.location.origin;
+  }
+
+  // 开发环境下，或者分离部署时的默认回退方案
+  // 尝试使用相对路径，让web服务器处理代理
+  return '';
+})();
 
 /**
  * 轮询间隔（毫秒）

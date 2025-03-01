@@ -92,12 +92,26 @@ function setToolsLoading(isLoading) {
 }
 
 /**
- * 显示或隐藏自动执行指示器
- * @param {boolean} visible - 是否显示
+ * Set auto-execution indicator visibility
+ * @param {boolean} visible - Whether the indicator should be visible
  */
 function setAutoExecutionIndicator(visible) {
   if (elements.autoExecutionIndicator) {
     elements.autoExecutionIndicator.style.display = visible ? 'block' : 'none';
+    
+    // Update the text content based on the state
+    if (visible) {
+      const label = elements.autoExecutionIndicator.querySelector('span');
+      if (label) {
+        label.textContent = 'Auto-executing tool...';
+      }
+      
+      // Show cancel button
+      const cancelButton = elements.autoExecutionIndicator.querySelector('#cancel-auto-execution');
+      if (cancelButton) {
+        cancelButton.style.display = 'inline-block';
+      }
+    }
   }
 }
 
@@ -175,75 +189,61 @@ function addThinkingToChat(thinking) {
 }
 
 /**
- * 添加工具调用到聊天界面
- * @param {Object} toolCall - 工具调用对象
+ * Add tool call to chat
+ * @param {Object} toolCall - Tool call object
  */
 function addToolCallToChat(toolCall) {
   if (!elements.chatMessages) return;
   
+  console.log('Adding tool call to chat:', toolCall.name);
+  
+  // Create tool call element
   const toolCallDiv = document.createElement('div');
   toolCallDiv.className = 'tool-call';
   toolCallDiv.dataset.toolUseId = toolCall.id;
   
-  // 创建工具调用头部
-  const header = document.createElement('div');
-  header.className = 'tool-call-header';
-  header.innerHTML = `
-    <span class="tool-call-toggle">${TOOL_DISPLAY.INITIAL_COLLAPSED ? TOOL_DISPLAY.EXPAND_ARROW : TOOL_DISPLAY.COLLAPSE_ARROW}</span>
-    <strong>Tool Call: ${escapeHtml(toolCall.name)}</strong>
+  // Format tool input as JSON
+  const formattedInput = JSON.stringify(toolCall.input, null, 2);
+  
+  // Create tool call content
+  const toolCallHtml = `
+    <div class="tool-call-header">
+      <span class="toggle-arrow">${TOOL_DISPLAY.COLLAPSE_ARROW}</span>
+      <strong>${toolCall.name}</strong>
+    </div>
+    <div class="tool-content">
+      <div class="tool-section-label">Input:</div>
+      <pre class="tool-input"><code class="language-json">${escapeHtml(formattedInput)}</code></pre>
+    </div>
   `;
   
-  // 创建工具调用内容
-  const content = document.createElement('div');
-  content.className = 'tool-call-content';
-  content.style.display = TOOL_DISPLAY.INITIAL_COLLAPSED ? 'none' : 'block';
-  
-  // 参数格式化
-  const formattedParams = JSON.stringify(toolCall.input, null, 2);
-  content.innerHTML = `<pre>${escapeHtml(formattedParams)}</pre>`;
-  
-  // 创建工具执行按钮
-  const executeButton = document.createElement('button');
-  executeButton.className = 'execute-tool-button';
-  executeButton.textContent = '执行工具';
-  executeButton.dataset.toolUseId = toolCall.id;
-  executeButton.dataset.toolName = toolCall.name;
-  executeButton.dataset.toolInput = JSON.stringify(toolCall.input);
-  
-  // 工具执行状态标签
-  const statusLabel = document.createElement('span');
-  statusLabel.className = 'tool-status';
-  statusLabel.dataset.toolUseId = toolCall.id;
-  
-  // 组装工具调用UI
-  toolCallDiv.appendChild(header);
-  toolCallDiv.appendChild(content);
-  toolCallDiv.appendChild(executeButton);
-  toolCallDiv.appendChild(statusLabel);
-  
-  // 添加到聊天界面
+  toolCallDiv.innerHTML = toolCallHtml;
   elements.chatMessages.appendChild(toolCallDiv);
+  
+  // Apply syntax highlighting
+  if (window.hljs) {
+    toolCallDiv.querySelectorAll('pre code').forEach(block => {
+      try {
+        window.hljs.highlightBlock(block);
+      } catch (e) {
+        console.error('Error applying syntax highlighting:', e);
+      }
+    });
+  }
+  
+  // Set up toggle functionality
+  setupToolCallToggle(toolCallDiv);
+  
+  // Scroll to bottom
   elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
   
-  // 添加事件监听器
-  header.addEventListener('click', function() {
-    const isCollapsed = content.style.display === 'none';
-    content.style.display = isCollapsed ? 'block' : 'none';
-    const toggle = this.querySelector('.tool-call-toggle');
-    if (toggle) {
-      toggle.innerHTML = isCollapsed ? TOOL_DISPLAY.COLLAPSE_ARROW : TOOL_DISPLAY.EXPAND_ARROW;
-    }
-  });
-  
-  // 工具执行按钮事件
-  executeButton.addEventListener('click', function() {
-    // 显示工具结果输入模态框
+  // Show tool result modal if auto-execute is disabled
+  const settings = state.getSettings();
+  if (!settings.autoExecuteTools) {
+    state.setCurrentToolUseId(toolCall.id);
+    state.setWaitingForToolResult(true);
     showToolResultModal();
-    
-    // 将工具ID存储在全局状态
-    // 注：这里应改为调用状态管理模块
-    currentToolUseId = toolCall.id;
-  });
+  }
 }
 
 /**

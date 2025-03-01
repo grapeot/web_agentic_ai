@@ -56,39 +56,55 @@ function setupSliderEvents(elements) {
 }
 
 /**
- * 设置按钮点击事件
- * @param {Object} elements - DOM元素引用
+ * Setup button event listeners
+ * @param {Object} elements - DOM element references
  * @private
  */
 function setupButtonEvents(elements) {
-  // 发送按钮
+  // Send button
   if (elements.sendButton) {
     elements.sendButton.addEventListener('click', handleSendMessage);
   }
   
-  // 用户输入回车发送
-  if (elements.userInput) {
-    elements.userInput.addEventListener('keypress', function(e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSendMessage();
-      }
-    });
-  }
-  
-  // 清除聊天按钮
-  if (elements.clearChatButton) {
-    elements.clearChatButton.addEventListener('click', handleClearChat);
-  }
-  
-  // 提交工具结果按钮
+  // Submit tool result button
   if (elements.submitToolResultButton) {
     elements.submitToolResultButton.addEventListener('click', handleSubmitToolResult);
   }
   
-  // 取消自动执行按钮
+  // Clear chat button
+  if (elements.clearChatButton) {
+    elements.clearChatButton.addEventListener('click', handleClearChat);
+  }
+  
+  // Auto-execute tools toggle
+  if (elements.autoExecuteToolsCheckbox) {
+    elements.autoExecuteToolsCheckbox.addEventListener('change', function() {
+      const autoExecuteEnabled = this.checked;
+      state.updateSetting('autoExecuteTools', autoExecuteEnabled);
+      console.log('Auto-execute tools:', autoExecuteEnabled ? 'enabled' : 'disabled');
+      
+      // If enabling auto-execute and there's a pending tool call, start auto-execution immediately
+      if (autoExecuteEnabled && state.getCurrentToolUseId()) {
+        state.setAutoExecutingTools(true);
+        ui.setAutoExecutionIndicator(true);
+        tools.startPollingForUpdates();
+        
+        // Hide any open tool result modal
+        ui.hideToolResultModal();
+      }
+    });
+  }
+  
+  // Cancel auto-execution button
   if (elements.cancelAutoExecutionButton) {
     elements.cancelAutoExecutionButton.addEventListener('click', handleCancelAutoExecution);
+  }
+  
+  // Thinking mode checkbox
+  if (elements.thinkingModeCheckbox) {
+    elements.thinkingModeCheckbox.addEventListener('change', function() {
+      state.updateSetting('thinkingMode', this.checked);
+    });
   }
 }
 
@@ -98,22 +114,13 @@ function setupButtonEvents(elements) {
  * @private
  */
 function setupOtherEvents(elements) {
-  // 思考模式开关
-  if (elements.thinkingModeSwitch) {
-    elements.thinkingModeSwitch.addEventListener('change', function() {
-      state.updateSetting('thinkingMode', this.checked);
-      
-      // 更新思考预算滑块的可用状态
-      if (elements.thinkingBudgetSlider) {
-        elements.thinkingBudgetSlider.disabled = !this.checked;
+  // 用户输入回车发送
+  if (elements.userInput) {
+    elements.userInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSendMessage();
       }
-    });
-  }
-  
-  // 自动执行工具开关
-  if (elements.autoExecuteToolsSwitch) {
-    elements.autoExecuteToolsSwitch.addEventListener('change', function() {
-      state.updateSetting('autoExecuteTools', this.checked);
     });
   }
   
@@ -292,23 +299,25 @@ async function handleSubmitToolResult() {
 }
 
 /**
- * 处理取消自动执行
+ * Handle cancel auto-execution button click
  */
 function handleCancelAutoExecution() {
-  // 停止轮询
+  console.log('Cancelling auto-execution of tools');
+  
+  // Stop polling interval
   const pollingInterval = state.getPollingInterval();
   if (pollingInterval) {
     clearInterval(pollingInterval);
     state.setPollingInterval(null);
   }
   
-  // 更新状态
+  // Update state
   state.setAutoExecutingTools(false);
   
-  // 隐藏指示器
+  // Hide indicator
   ui.setAutoExecutionIndicator(false);
   
-  console.log('自动执行已取消');
+  console.log('Auto-execution cancelled');
 }
 
 /**
