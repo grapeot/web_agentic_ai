@@ -13,95 +13,55 @@ import * as utils from './utils.js';
  * @param {Array} content - Message content array
  */
 function processAssistantMessage(content) {
-  if (!content || !Array.isArray(content)) {
-    console.error('Invalid message content:', content);
-    return;
-  }
-  
-  // Debug output to help diagnose issues
   console.log('Processing assistant message content:', JSON.stringify(content, null, 2));
   
-  let textContent = '';
-  let toolCalls = [];
+  let finalTextContent = '';
+  let toolCall = null;
   
-  // Get displayed tool IDs to avoid duplicate display
-  const displayedToolIds = new Set();
-  document.querySelectorAll(`.${config.CSS_CLASSES.MESSAGE.TOOL_CALL}`).forEach(el => {
-    if (el.dataset.toolId) {
-      displayedToolIds.add(el.dataset.toolId);
-    }
-  });
-  
-  // Process message content
   content.forEach(item => {
     console.log('Processing content item:', item);
     
+    // Skip thinking type messages
     if (item.type === 'thinking') {
-      console.log('Processing thinking content:', item.thinking);
-      ui.addThinkingToChat(item.thinking);
-    } else if (item.type === config.MESSAGE_TYPES.TEXT) {
-      // For text messages, concatenate content with proper spacing
-      if (textContent && item.text) {
-        // Only add a space if needed to prevent words from running together
-        if (!textContent.endsWith(' ') && !textContent.endsWith('\n') && 
-            !item.text.startsWith(' ') && !item.text.startsWith('\n')) {
-          textContent += ' '; // Add space between concatenated text chunks
-        }
-      }
-      
-      // Ensure item.text is a string
-      if (typeof item.text === 'string') {
-        textContent += item.text;
-      } else if (item.text) {
-        // If item.text is an object, convert to string
-        console.warn('Text item is not a string:', item.text);
-        textContent += JSON.stringify(item.text);
-      }
-    } else if (item.type === config.MESSAGE_TYPES.TOOL_USE && !displayedToolIds.has(item.id)) {
-      console.log('Found tool call:', item);
-      // Tool call
-      toolCalls.push({
+      return;
+    }
+    
+    if (item.type === 'text' && item.text) {
+      // Ensure text is a string
+      finalTextContent = typeof item.text === 'string' ? item.text : JSON.stringify(item.text);
+    } else if (item.type === 'tool_use') {
+      toolCall = {
         id: item.id,
         name: item.name,
         input: item.input
-      });
-      
-      // Record last tool call ID
-      state.setLastToolCallId(item.id);
-      
-      // Auto-execute if enabled
-      if (state.getSettings().autoExecuteTools) {
-        // Set state for auto-execution
-        state.setCurrentToolUseId(item.id);
-        state.setAutoExecutingTools(true);
-        
-        // Start polling for updates
-        startPollingForUpdates();
-      }
+      };
     }
   });
   
-  // Process text content to clean up line breaks before displaying
-  if (textContent) {
-    console.log('Final text content:', textContent);
-    // Clean up unnecessary consecutive line breaks
-    textContent = utils.cleanLineBreaks(textContent);
-    
-    // Only display if content is new
-    if (!state.hasProcessedContent(textContent)) {
-      // Add the message to the chat
-      ui.addMessageToChat(config.ROLES.ASSISTANT, textContent);
-      
-      // Add to processed content set to prevent duplication
-      state.addProcessedContent(textContent);
-    }
+  // Log final text content for debugging
+  console.log('Final text content:', finalTextContent);
+  
+  // Add text message if we have one and haven't processed it yet
+  if (finalTextContent && !state.hasProcessedContent(finalTextContent)) {
+    ui.addMessageToChat(config.ROLES.ASSISTANT, finalTextContent);
+    state.addProcessedContent(finalTextContent);
   }
   
-  // Display tool calls
-  toolCalls.forEach(toolCall => {
+  // Display tool call if we have one
+  if (toolCall) {
     console.log('Displaying tool call:', toolCall);
     ui.addToolCallToChat(toolCall);
-  });
+    
+    // Update state
+    state.setLastToolCallId(toolCall.id);
+    state.setCurrentToolUseId(toolCall.id);
+    
+    // If auto-execute is enabled, start polling for updates
+    if (state.getSettings().autoExecuteTools) {
+      console.log('Auto executing tools:', state.getSettings().autoExecuteTools);
+      startPollingForUpdates();
+    }
+  }
 }
 
 /**

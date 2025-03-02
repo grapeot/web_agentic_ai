@@ -153,10 +153,17 @@ function clearChat() {
  * Add message to chat
  * @param {string} role - Message role (user/assistant)
  * @param {string|Object|Array} content - Message content
+ * @param {string} type - Message type (text/thinking)
  */
-function addMessageToChat(role, content) {
-  console.log('Adding message type:', typeof content, role, content);
+function addMessageToChat(role, content, type) {
+  console.log('Adding message type:', typeof content, role, content, type);
   
+  // Skip only if type is explicitly set to THINKING
+  if (type && type === MESSAGE_TYPES.THINKING) {
+    console.log('Skipping thinking message');
+    return;
+  }
+
   const messageDiv = document.createElement('div');
   // Add correct role-specific class
   messageDiv.classList.add('message');
@@ -178,7 +185,11 @@ function addMessageToChat(role, content) {
         .map(block => block.text)
         .join('\n');
     } else if (content.type === 'text' && content.text) {
+      // Handle single content object with type and text fields
       textContent = content.text;
+    } else if (content.content) {
+      // Handle object with direct content field
+      textContent = content.content;
     }
   }
   
@@ -187,27 +198,51 @@ function addMessageToChat(role, content) {
     return;
   }
   
-  // Parse the text content with marked
-  try {
-    messageDiv.innerHTML = marked(textContent);
-    
-    // Apply syntax highlighting to code blocks
-    messageDiv.querySelectorAll('pre code').forEach(block => {
-      if (window.hljs) {
-        try {
-          window.hljs.highlightElement(block);
-        } catch (e) {
-          console.error('Error highlighting code block:', e);
-        }
+  // Skip if this exact message content was already rendered
+  const processedMessages = document.querySelectorAll('.message');
+  for (const existingMessage of processedMessages) {
+    if (existingMessage.textContent.trim() === textContent.trim()) {
+      return;
+    }
+  }
+  
+  // Function to render markdown content
+  const renderMarkdown = () => {
+    try {
+      // Check if marked is available and is a function
+      if (window.marked && typeof window.marked === 'function') {
+        messageDiv.innerHTML = window.marked(textContent);
+        // Apply syntax highlighting to code blocks
+        messageDiv.querySelectorAll('pre code').forEach(block => {
+          if (window.hljs) {
+            try {
+              window.hljs.highlightElement(block);
+            } catch (e) {
+              console.error('Error highlighting code block:', e);
+            }
+          }
+        });
+      } else {
+        // If marked is not available, display as plain text with line breaks
+        messageDiv.innerHTML = textContent.replace(/\n/g, '<br>');
       }
-    });
-  } catch (error) {
-    console.error('Error parsing markdown:', error);
-    messageDiv.textContent = textContent;
+    } catch (error) {
+      console.error('Error parsing markdown:', error);
+      // Fallback to plain text with line breaks
+      messageDiv.innerHTML = textContent.replace(/\n/g, '<br>');
+    }
+  };
+
+  // First attempt to render
+  renderMarkdown();
+  
+  // If marked is not available yet, try again after a short delay
+  if (!window.marked || typeof window.marked !== 'function') {
+    setTimeout(renderMarkdown, 100);
   }
   
   // Only append if we have content
-  if (messageDiv.innerHTML) {
+  if (messageDiv.textContent || messageDiv.innerHTML) {
     const chatMessages = document.getElementById('chat-messages');
     if (chatMessages) {
       chatMessages.appendChild(messageDiv);
