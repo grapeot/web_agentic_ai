@@ -347,19 +347,17 @@ async def submit_tool_results(
                 client
             )
         
-        # Process the tool result with Claude
-        logger.info(f"Processing tool result for conversation {conversation_id}")
-        result = await process_tool_calls_and_continue(
-            conversation_id, 
-            tool_output.tool_use_id, 
-            tool_output.content,
-            background_tasks=background_tasks if auto_execute_tools else None
-        )
+        # Prepare the result to return to the frontend
+        result = {
+            "message": Message(role="assistant", content=content),
+            "conversation_id": conversation_id,
+            "tool_calls": [] if auto_execute_tools else tool_calls,
+        }
         
         # Process Markdown content in message before returning
         if "message" in result and result["message"] and "content" in result["message"]:
-            processed_content = MarkdownService.process_message_content(result["message"]["content"])
-            result["message"]["content"] = processed_content
+            processed_content = MarkdownService.process_message_content(result["message"].content)
+            result["message"].content = processed_content
             
         return UserResponse(**result)
         

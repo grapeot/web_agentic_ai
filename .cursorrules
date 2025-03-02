@@ -45,5 +45,10 @@ The goal is to help you maintain a big picture as well as the progress of the ta
     - Clean up consecutive line breaks by replacing 3+ consecutive line breaks with just 2
     - Extract line break processing into a reusable function across the codebase
     - Ensure consistent line break handling between the tools.js and ui.js modules
+- When implementing backend Markdown to HTML conversion:
+  - Use `markdown2` for conversion and `bleach` for HTML sanitization
+  - Bleach removes dangerous HTML tags but preserves their content (e.g., `<script>` tags are removed but text inside remains)
+  - Test both the conversion logic and the sanitization process separately
+  - Return format metadata to indicate content type (html/text) for the frontend
 
 # Scratchpad
