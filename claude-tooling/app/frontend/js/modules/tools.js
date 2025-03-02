@@ -7,6 +7,7 @@ import { state } from './state.js';
 import * as ui from './ui.js';
 import * as api from './api.js';
 import * as utils from './utils.js';
+import * as filePreview from './filePreview.js';
 
 /**
  * Process assistant message content
@@ -144,9 +145,40 @@ function startPollingForUpdates() {
 }
 
 /**
- * Process new messages in updates
- * @param {Array} newMessages - New messages array
- * @private
+ * Process tool results
+ * @param {string} result - Tool result string (JSON)
+ * @param {string} toolUseId - Tool use ID
+ * @returns {Object} Processed tool result
+ */
+function processToolResult(result, toolUseId) {
+  try {
+    // Parse tool result if it's a string
+    const parsedResult = typeof result === 'string' ? JSON.parse(result) : result;
+    
+    // Check for generated files in the tool result
+    if (parsedResult && parsedResult.generated_files && 
+        Array.isArray(parsedResult.generated_files) && 
+        parsedResult.generated_files.length > 0) {
+      console.log('Tool generated files detected:', parsedResult.generated_files);
+      
+      // Add a flag to indicate this result has files that should be previewed
+      parsedResult._hasGeneratedFiles = true;
+    }
+    
+    return parsedResult;
+  } catch (error) {
+    console.error('Error processing tool result:', error);
+    return {
+      status: 'error',
+      message: `Failed to parse tool result: ${error.message}`,
+      original: result
+    };
+  }
+}
+
+/**
+ * Update chat with new messages
+ * @param {Array} newMessages - Array of new messages
  */
 function updateChatWithNewMessages(newMessages) {
   if (!Array.isArray(newMessages) || newMessages.length === 0) return;
@@ -161,6 +193,7 @@ function updateChatWithNewMessages(newMessages) {
   const lastHandledToolId = state.getLastToolCallId();
   let foundLastHandled = !lastHandledToolId; // If no last ID, consider it found
   let hasNewToolCalls = false;
+  let hasToolResults = false;
   
   // Process messages
   for (const message of newMessages) {
@@ -248,7 +281,17 @@ function updateChatWithNewMessages(newMessages) {
       // User message processing - find tool results
       for (const item of message.content) {
         if (item.type === config.MESSAGE_TYPES.TOOL_RESULT && item.tool_use_id) {
-          pendingToolResults.set(item.tool_use_id, item.content);
+          // Process the tool result to check for generated files
+          const processedResult = processToolResult(item.content, item.tool_use_id);
+          pendingToolResults.set(item.tool_use_id, processedResult);
+          hasToolResults = true;
+          
+          // Check if this is the result for the current tool use ID
+          if (item.tool_use_id === state.getCurrentToolUseId()) {
+            console.log('Found result for current tool use ID, tool execution complete');
+            // Mark execution as complete for this tool
+            state.setCurrentToolUseId(null);
+          }
         }
       }
     }
@@ -259,18 +302,24 @@ function updateChatWithNewMessages(newMessages) {
     ui.addToolResultToChat(result, toolUseId);
   });
   
-  // Update auto-execution indicator
+  // Update auto-execution indicator and state
   if (hasNewToolCalls) {
+    // New tool calls - keep indicator on
     ui.setAutoExecutionIndicator(true);
-  } else if (pendingToolResults.size > 0 && !hasNewToolCalls) {
-    // If there are results but no new tool calls, conversation might be ending
-    state.setAutoExecutingTools(false);
-    ui.setAutoExecutionIndicator(false);
+  } else if (hasToolResults && !hasNewToolCalls) {
+    // Tool results received but no new tool calls - likely finished this step
+    // Check if we're actually waiting for any more tools
+    if (!state.getCurrentToolUseId()) {
+      console.log('No active tool executions, turning off auto-execution indicator');
+      state.setAutoExecutingTools(false);
+      ui.setAutoExecutionIndicator(false);
+    }
   }
 }
 
 export {
   processAssistantMessage,
   startPollingForUpdates,
-  updateChatWithNewMessages
+  updateChatWithNewMessages,
+  processToolResult
 }; 

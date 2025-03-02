@@ -70,7 +70,7 @@ if (!isTestEnvironment) {
       
       // Debug logs for welcome message
       console.log('Adding welcome message with role:', config.ROLES.ASSISTANT);
-      const welcomeMessage = 'Hello! I am Claude, your AI assistant. How can I help you today?';
+      const welcomeMessage = 'Hello! I am Claude, your AI assistant. Ask me anything or let me help you with tasks.';
       console.log('Welcome message content:', welcomeMessage);
       
       // Add welcome message

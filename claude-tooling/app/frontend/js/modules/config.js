@@ -90,40 +90,57 @@ const FILE_PREVIEW = {
 };
 
 /**
- * CSS class names
+ * CSS classes
  */
 const CSS_CLASSES = {
-  MESSAGE: {
-    CONTAINER: 'message',
+  CHAT: {
+    CONTAINER: 'chat-container',
+    MESSAGES: 'chat-messages',
+    MESSAGE: 'chat-message',
     USER: 'user-message',
     ASSISTANT: 'assistant-message',
-    SYSTEM: 'system-message',
-    THINKING: 'thinking',
-    TOOL_CALL: 'tool-call',
-    TOOL_RESULT: 'tool-result'
+    TOOL: 'tool-message',
+    THINKING: 'thinking-message',
+    CONTENT: 'message-content',
+    TIMESTAMP: 'message-timestamp'
   },
   TOOL: {
-    HEADER: 'tool-call-header',
-    CONTENT: 'tool-content',
-    RESULT_CONTAINER: 'tool-result-container',
-    SECTION_LABEL: 'tool-section-label',
+    CONTAINER: 'tool-container',
+    HEADER: 'tool-header',
+    BODY: 'tool-body',
+    RESULT: 'tool-result',
     INPUT: 'tool-input',
-    TOGGLE: 'toggle-arrow',
-    COLLAPSED: 'collapsed'
+    OUTPUT: 'tool-output',
+    COLLAPSED: 'collapsed',
+    EXPAND_ICON: 'expand-icon',
+    AUTO_EXECUTE: 'auto-execute-indicator',
+    ACTIVE: 'active',
+    GENERATED_FILES: 'tool-generated-files',
+    FILES_LIST: 'tool-files-list',
+    FILE_ITEM: 'tool-file-item'
+  },
+  PREVIEW: {
+    MARKDOWN: 'markdown-preview',
+    HTML: 'html-preview',
+    IMAGE: 'image-preview',
+    LOADING: 'preview-loading',
+    CLOSE_BTN: 'preview-close-btn',
+    CONTAINER: 'preview-container',
+    IMAGE_VIEWER: 'image-viewer-modal'
   },
   FILE: {
     RESULT: 'file-result',
-    HEADER: 'file-result-header',
-    PREVIEW: 'file-preview',
+    NAME: 'file-name',
+    ICON: 'file-icon',
     DOWNLOAD_LINK: 'file-download-link',
-    JSON_DETAILS: 'file-json-details'
+    INFO: 'file-info',
+    ACTIONS: 'file-actions',
+    SIZE: 'file-size'
   },
-  PREVIEW: {
-    MARKDOWN: 'markdown-content-preview',
-    HTML: 'html-content-preview',
-    IMAGE: 'image-preview',
-    LOADING: 'preview-loading',
-    CLOSE_BTN: 'close-preview'
+  LOADER: {
+    CONTAINER: 'loader-container',
+    SPINNER: 'spinner',
+    TEXT: 'loader-text'
   }
 };
 

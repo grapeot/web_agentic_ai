@@ -167,12 +167,43 @@ Tool call lifecycle management:
 - Auto execution mode support
 - Polling update mechanism
 - Tool result processing and display
+- Enhanced tool completion detection
+- Automatic management of auto-execution indicator
 
 **Key Flow:**
 ```javascript
 processAssistantMessage(content)  // Process assistant message
 startPollingForUpdates()         // Start polling update
-updateChatWithNewMessages(msgs)   // Process new message update
+updateChatWithNewMessages(msgs)   // Process new message update with tool result tracking
+```
+
+**Tool Result Tracking:**
+```javascript
+// Example of improved tool result tracking
+function updateChatWithNewMessages(newMessages) {
+  // Track if tool results exist in the current update
+  let hasToolResults = false;
+  
+  // Process messages
+  for (const message of newMessages) {
+    // Look for tool results in user messages
+    if (message.role === ROLES.USER && message.content) {
+      for (const item of message.content) {
+        if (item.type === MESSAGE_TYPES.TOOL_RESULT) {
+          hasToolResults = true;
+          // Process tool result
+        }
+      }
+    }
+  }
+  
+  // Update auto-execution indicator based on combined state
+  if (hasToolResults && !hasNewToolCalls && !state.getCurrentToolUseId()) {
+    // No more active tools, turn off indicator
+    state.setAutoExecutingTools(false);
+    ui.setAutoExecutionIndicator(false);
+  }
+}
 ```
 
 ### 3. UI Rendering (ui.js)
@@ -195,6 +226,7 @@ const elements = {
 - Message deduplication display
 - Loading status management
 - Tool result modal
+- Auto-execution indicator management
 
 **Key Methods:**
 ```javascript
@@ -215,6 +247,12 @@ Application initialization and module integration:
 4. Reset state
 5. Get and initialize available tools
 6. Display welcome message
+
+**Module Coordination:**
+- Centralized initialization
+- Clear dependency ordering
+- Cross-module event coordination
+- Error propagation management
 
 **Test Support:**
 - Provide test environment compatibility
@@ -323,6 +361,7 @@ const SUPPORTED_TYPES = {
 - HTML file safe preview
 - Image file preview and zoom
 - Code file highlighting (limited)
+- Automatic display of tool-generated files
 
 **Security Mechanism:**
 - HTML sandbox isolation
@@ -374,6 +413,8 @@ getFileIcon(filename)         // Get file icon
 - Auto execution status management
 - Polling update error handling
 - Result display verification
+- Reliable tool completion detection
+- Accurate auto-execution indicator state
 
 ### 3. UI Rendering
 - DOM element cache optimization
@@ -410,6 +451,7 @@ getFileIcon(filename)         // Get file icon
 - Rendering performance optimization
 - File type validation
 - Error handling mechanism
+- Automatic detection and display of generated files
 
 ### 9. Utility Functions
 - Function purity guarantee
@@ -436,6 +478,11 @@ getFileIcon(filename)         // Get file icon
 3. Implement corresponding handling methods
 4. Add necessary state management code
 
+### 4. Enhancing Tool Execution
+1. Update tool result tracking in updateChatWithNewMessages in tools.js
+2. Modify auto-execution indicator management in ui.js
+3. Add appropriate state tracking in state.js
+
 ## Testing Points
 
 ### 1. State Management Testing
@@ -449,15 +496,19 @@ getFileIcon(filename)         // Get file icon
 - Auto execution logic
 - Polling update mechanism
 - Result handling process
+- Tool completion detection accuracy
+- Auto-execution indicator state transitions
 
 ### 3. UI Rendering Testing
 - Message rendering correctness
 - Loading state switching
 - Error handling mechanism
 - Dynamic content updates
+- Tool result display consistency
 
 ### 4. Integration Testing
 - Module interactions
 - State synchronization
 - Error propagation
-- Performance behavior 
+- Performance behavior
+- Cross-module event handling 
