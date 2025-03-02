@@ -1,65 +1,65 @@
 # Frontend Documentation
 
-## 项目结构
+## Project Structure
 
 ```
 frontend/
-├── css/                 # 样式文件
-│   └── styles.css      # 主样式文件
-├── js/                  # JavaScript 源代码
-│   ├── modules/         # 模块化组件
-│   │   ├── api.js      # API 通信层
-│   │   ├── config.js   # 配置常量
-│   │   ├── events.js   # 事件处理
-│   │   ├── filePreview.js # 文件预览
-│   │   ├── state.js    # 状态管理
-│   │   ├── tools.js    # 工具调用处理
-│   │   ├── ui.js       # UI 渲染
-│   │   └── utils.js    # 工具函数
-│   └── main.js         # 应用入口
-├── node_modules/        # 依赖包
-├── index.html          # 主页面
-├── package.json        # 项目配置
-└── README.md           # 文档
+├── css/                 # Style files
+│   └── styles.css      # Main style file
+├── js/                  # JavaScript source code
+│   ├── modules/         # Modular components
+│   │   ├── api.js      # API communication layer
+│   │   ├── config.js   # Configuration constants
+│   │   ├── events.js   # Event handling
+│   │   ├── filePreview.js # File preview
+│   │   ├── state.js    # State management
+│   │   ├── tools.js    # Tool call handling
+│   │   ├── ui.js       # UI rendering
+│   │   └── utils.js    # Utility functions
+│   └── main.js         # Application entry
+├── node_modules/        # Dependencies
+├── index.html          # Main page
+├── package.json        # Project configuration
+└── README.md           # Documentation
 ```
 
-## 技术栈
+## Technology Stack
 
-### 1. 核心依赖
+### 1. Core Dependencies
 ```json
 {
-  "type": "module",          // 使用 ES Modules
+  "type": "module",          // Using ES Modules
   "devDependencies": {
-    "@babel/core": "^7.22.5",      // Babel 核心
-    "@babel/preset-env": "^7.22.5", // Babel 预设
-    "jest": "^29.7.0",             // 测试框架
-    "jest-environment-jsdom": "^29.7.0"  // DOM 测试环境
+    "@babel/core": "^7.22.5",      // Babel core
+    "@babel/preset-env": "^7.22.5", // Babel preset
+    "jest": "^29.7.0",             // Testing framework
+    "jest-environment-jsdom": "^29.7.0"  // DOM testing environment
   }
 }
 ```
 
-### 2. 外部库
-- Bootstrap 5.3.2 (UI框架)
-- Font Awesome 6.4.0 (图标)
-- Highlight.js 11.7.0 (代码高亮)
-- Marked (Markdown解析)
+### 2. External Libraries
+- Bootstrap 5.3.2 (UI framework)
+- Font Awesome 6.4.0 (Icons)
+- Highlight.js 11.7.0 (Code highlighting)
+- Marked (Markdown parsing)
 
-### 3. 样式系统
+### 3. Style System
 ```css
 :root {
-  --primary-color: #4f46e5;    // 主色调
-  --bg-color: #f9fafb;         // 背景色
-  --card-bg: #ffffff;          // 卡片背景
-  --text-color: #1f2937;       // 文本颜色
-  // ... 其他主题变量
+  --primary-color: #4f46e5;    // Main color
+  --bg-color: #f9fafb;         // Background color
+  --card-bg: #ffffff;          // Card background
+  --text-color: #1f2937;       // Text color
+  // ... other theme variables
 }
 ```
 
-## 页面结构
+## Page Structure
 
-### 1. 布局组件
+### 1. Layout Components
 
-**工具侧边栏:**
+**Tools Sidebar:**
 ```html
 <div class="tools-container">
   <div class="tools-header">
@@ -69,7 +69,7 @@ frontend/
 </div>
 ```
 
-**聊天主区域:**
+**Chat Main Area:**
 ```html
 <div class="chat-container">
   <div class="chat-header">...</div>
@@ -78,19 +78,19 @@ frontend/
 </div>
 ```
 
-**设置面板:**
+**Settings Panel:**
 ```html
 <div class="settings-panel">
-  <!-- 温度控制 -->
-  <!-- 最大令牌数 -->
-  <!-- 思考模式设置 -->
-  <!-- 自动执行开关 -->
+  <!-- Temperature control -->
+  <!-- Maximum token count -->
+  <!-- Thinking mode setting -->
+  <!-- Auto execution switch -->
 </div>
 ```
 
-### 2. 交互组件
+### 2. Interactive Components
 
-**消息输入:**
+**Message Input:**
 ```html
 <form id="chat-form">
   <textarea id="user-input"></textarea>
@@ -100,183 +100,183 @@ frontend/
 </form>
 ```
 
-**工具结果模态框:**
+**Tool Result Modal:**
 ```html
 <div class="modal" id="toolResultModal">
   <div class="modal-dialog">
     <div class="modal-content">
-      <!-- 工具结果输入和提交 -->
+      <!-- Tool result input and submission -->
     </div>
   </div>
 </div>
 ```
 
-## 样式实现
+## Style Implementation
 
-### 1. 响应式设计
-- 弹性布局系统
-- 移动端适配
-- 断点管理
-- 容器适应
+### 1. Responsive Design
+- Elastic layout system
+- Mobile device adaptation
+- Breakpoint management
+- Container adaptation
 
-### 2. 主题系统
-- CSS变量定义
-- 颜色系统
-- 间距规范
-- 阴影效果
+### 2. Theme System
+- CSS variable definition
+- Color system
+- Space specification
+- Shadow effect
 
-### 3. 动画效果
-- 消息渐入
-- 状态过渡
-- 加载动画
-- 交互反馈
+### 3. Animation Effect
+- Message fade-in
+- State transition
+- Loading animation
+- Interactive feedback
 
-### 4. 可访问性
-- ARIA标签支持
-- 键盘导航
-- 焦点管理
-- 屏幕阅读器兼容
+### 4. Accessibility
+- ARIA tag support
+- Keyboard navigation
+- Focus management
+- Screen reader compatibility
 
-## 核心功能实现
+## Core Function Implementation
 
-### 1. 状态管理 (state.js)
+### 1. State Management (state.js)
 
-使用单例模式实现的状态管理器:
+Using singleton pattern state manager:
 
-**状态内容:**
-- 对话历史 (messages)
-- 工具调用状态 (currentToolUseId, waitingForToolResult)
-- 自动执行状态 (autoExecutingTools, pollingInterval)
-- 设置项 (settings)
-- 消息去重追踪 (processedMessageIds, processedTextContent)
+**State Content:**
+- Conversation history (messages)
+- Tool call status (currentToolUseId, waitingForToolResult)
+- Auto execution status (autoExecutingTools, pollingInterval)
+- Settings (settings)
+- Message deduplication tracking (processedMessageIds, processedTextContent)
 
-**关键方法:**
+**Key Methods:**
 ```javascript
-state.reset()                    // 重置所有状态
-state.addMessage(message)        // 添加消息到历史
-state.updateSetting(key, value)  // 更新设置
-state.hasProcessedMessage(id)    // 检查消息是否已处理
-state.hasProcessedContent(text)  // 检查内容是否已处理
+state.reset()                    // Reset all states
+state.addMessage(message)        // Add message to history
+state.updateSetting(key, value)  // Update setting
+state.hasProcessedMessage(id)    // Check if message has been processed
+state.hasProcessedContent(text)  // Check if content has been processed
 ```
 
-### 2. 工具调用处理 (tools.js)
+### 2. Tool Call Handling (tools.js)
 
-工具调用生命周期管理:
+Tool call lifecycle management:
 
-**核心功能:**
-- 消息内容解析和工具调用识别
-- 自动执行模式支持
-- 轮询更新机制
-- 工具结果处理和展示
+**Core Functionality:**
+- Message content parsing and tool call recognition
+- Auto execution mode support
+- Polling update mechanism
+- Tool result processing and display
 
-**关键流程:**
+**Key Flow:**
 ```javascript
-processAssistantMessage(content)  // 处理助手消息
-startPollingForUpdates()         // 启动轮询更新
-updateChatWithNewMessages(msgs)   // 处理新消息更新
+processAssistantMessage(content)  // Process assistant message
+startPollingForUpdates()         // Start polling update
+updateChatWithNewMessages(msgs)   // Process new message update
 ```
 
-### 3. UI 渲染 (ui.js)
+### 3. UI Rendering (ui.js)
 
-界面渲染和交互处理:
+Interface rendering and interaction processing:
 
-**DOM 元素缓存:**
+**DOM Element Cache:**
 ```javascript
 const elements = {
   chatMessages: null,
   userInput: null,
   sendButton: null,
-  // ... 其他UI元素
+  // ... other UI elements
 }
 ```
 
-**核心功能:**
-- Markdown 渲染 (使用 marked 库)
-- 代码高亮 (使用 highlight.js)
-- 消息去重展示
-- 加载状态管理
-- 工具结果模态框
+**Core Functionality:**
+- Markdown rendering (using marked library)
+- Code highlighting (using highlight.js)
+- Message deduplication display
+- Loading status management
+- Tool result modal
 
-**关键方法:**
+**Key Methods:**
 ```javascript
-initializeUI()                   // 初始化UI元素
-addMessageToChat(role, content)  // 添加消息到聊天
-setLoading(isLoading)           // 设置加载状态
-setAutoExecutionIndicator(visible) // 设置自动执行指示器
+initializeUI()                   // Initialize UI elements
+addMessageToChat(role, content)  // Add message to chat
+setLoading(isLoading)           // Set loading status
+setAutoExecutionIndicator(visible) // Set auto execution indicator
 ```
 
-### 4. 主程序 (main.js)
+### 4. Main Program (main.js)
 
-应用初始化和模块集成:
+Application initialization and module integration:
 
-**初始化流程:**
-1. DOM加载完成后开始初始化
-2. 初始化UI组件
-3. 设置事件监听器
-4. 重置状态
-5. 获取并初始化可用工具
-6. 显示欢迎消息
+**Initialization Flow:**
+1. Initialize after DOM load is complete
+2. Initialize UI components
+3. Set event listeners
+4. Reset state
+5. Get and initialize available tools
+6. Display welcome message
 
-**测试支持:**
-- 提供测试环境兼容性
-- 导出模块接口供测试使用
+**Test Support:**
+- Provide test environment compatibility
+- Export module interface for test use
 
-### 5. API 通信层 (api.js)
+### 5. API Communication Layer (api.js)
 
-与后端的通信接口实现:
+API implementation for communication with backend:
 
-**核心接口:**
+**Core Interface:**
 ```javascript
-fetchAvailableTools()            // 获取可用工具列表
-sendMessage(msgs, settings, id)  // 发送聊天消息
-submitToolResult(id, result)     // 提交工具执行结果
-getConversationUpdates(id)       // 获取对话更新
+fetchAvailableTools()            // Get available tool list
+sendMessage(msgs, settings, id)  // Send chat message
+submitToolResult(id, result)     // Submit tool execution result
+getConversationUpdates(id)       // Get conversation update
 ```
 
-**错误处理机制:**
-- HTTP 状态码验证
-- 请求错误捕获和日志
-- 响应数据验证
-- 会话ID管理
+**Error Handling Mechanism:**
+- HTTP status code verification
+- Request error capture and logging
+- Response data verification
+- Session ID management
 
-**消息处理:**
-- 消息数组验证和过滤
-- 空内容过滤
-- 调试日志记录
-- 错误信息格式化
+**Message Processing:**
+- Message array verification and filtering
+- Empty content filtering
+- Debug log recording
+- Error information formatting
 
-### 6. 事件处理 (events.js)
+### 6. Event Handling (events.js)
 
-用户交互和事件管理:
+User interaction and event management:
 
-**事件监听器:**
+**Event Listeners:**
 ```javascript
-initializeEventListeners()      // 初始化所有事件监听
-handleChatSubmit(event)        // 处理聊天提交
-handleSettingsSubmit(event)    // 处理设置提交
-handleToolExecution(event)     // 处理工具执行
+initializeEventListeners()      // Initialize all event listeners
+handleChatSubmit(event)        // Process chat submission
+handleSettingsSubmit(event)    // Process setting submission
+handleToolExecution(event)     // Process tool execution
 ```
 
-**交互功能:**
-- 表单提交处理
-- 键盘快捷键(Enter发送)
-- 设置面板切换
-- 工具调用折叠/展开
+**Interactive Functionality:**
+- Form submission processing
+- Keyboard shortcut (Enter send)
+- Settings panel switching
+- Tool call folding/expanding
 
-**状态同步:**
-- 表单禁用状态
-- 加载指示器
-- 设置验证
-- 错误提示
+**State Synchronization:**
+- Form disable status
+- Loading indicator
+- Setting verification
+- Error prompt
 
-### 7. 配置管理 (config.js)
+### 7. Configuration Management (config.js)
 
-系统配置和常量定义:
+System configuration and constant definition:
 
-**API配置:**
+**API Configuration:**
 ```javascript
 const API_URL = (() => {
-  // 动态检测API端点
+  // Dynamic API endpoint detection
   if (window.API_BASE_URL) return window.API_BASE_URL;
   if (window.location.pathname.startsWith('/frontend/')) {
     return window.location.origin;
@@ -285,10 +285,10 @@ const API_URL = (() => {
 })();
 ```
 
-**系统常量:**
+**System Constants:**
 ```javascript
-const POLLING_INTERVAL = 5000;  // 轮询间隔(毫秒)
-const DEFAULT_SETTINGS = {      // 默认设置
+const POLLING_INTERVAL = 5000;  // Polling interval (milliseconds)
+const DEFAULT_SETTINGS = {      // Default settings
   temperature: 0.5,
   maxTokens: 4000,
   thinkingMode: true,
@@ -297,19 +297,19 @@ const DEFAULT_SETTINGS = {      // 默认设置
 };
 ```
 
-**UI常量:**
-- 消息类型定义
-- 角色类型定义
-- 文件预览配置
-- CSS类名映射
+**UI Constants:**
+- Message type definition
+- Role type definition
+- File preview configuration
+- CSS class name mapping
 
-### 8. 文件预览 (filePreview.js)
+### 8. File Preview (filePreview.js)
 
-文件预览功能实现:
+File preview functionality implementation:
 
-**预览类型:**
+**Preview Type:**
 ```javascript
-// 支持的文件类型
+// Supported file types
 const SUPPORTED_TYPES = {
   IMAGE: ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'],
   MARKDOWN: ['md', 'markdown'],
@@ -319,146 +319,146 @@ const SUPPORTED_TYPES = {
 };
 ```
 
-**核心功能:**
-- Markdown 文件预览和渲染
-- HTML 文件安全预览
-- 图片文件预览和缩放
-- 代码文件语法高亮
+**Core Functionality:**
+- Markdown file preview and rendering
+- HTML file safe preview
+- Image file preview and zoom
+- Code file syntax highlighting
 
-**安全机制:**
-- HTML 沙箱隔离
-- 链接安全属性
-- 下载链接验证
-- 错误边界处理
+**Security Mechanism:**
+- HTML sandbox isolation
+- Link security attributes
+- Download link verification
+- Error boundary handling
 
-### 9. 工具函数 (utils.js)
+### 9. Utility Functions (utils.js)
 
-通用功能函数集:
+General purpose function set:
 
-**字符串处理:**
+**String Processing:**
 ```javascript
-escapeHtml(text)              // HTML特殊字符转义
-cleanLineBreaks(text)         // 清理多余换行
-getFileName(path)             // 获取文件名
-getFileExtension(filename)    // 获取文件扩展名
+escapeHtml(text)              // HTML special character escaping
+cleanLineBreaks(text)         // Clean up extra line breaks
+getFileName(path)             // Get file name
+getFileExtension(filename)    // Get file extension
 ```
 
-**JSON处理:**
+**JSON Processing:**
 ```javascript
-safeJsonParse(str, default)   // 安全JSON解析
-safeJsonStringify(val, indent) // 安全JSON字符串化
-deepClone(obj)                // 深度克隆对象
+safeJsonParse(str, default)   // Safe JSON parsing
+safeJsonStringify(val, indent) // Safe JSON stringification
+deepClone(obj)                // Deep clone object
 ```
 
-**性能优化:**
+**Performance Optimization:**
 ```javascript
-debounce(func, wait)          // 函数防抖
-throttle(func, limit)         // 函数节流
+debounce(func, wait)          // Function debounce
+throttle(func, limit)         // Function throttle
 ```
 
-**文件处理:**
+**File Processing:**
 ```javascript
-getFileType(filename)         // 获取文件类型
-getFileIcon(filename)         // 获取文件图标
+getFileType(filename)         // Get file type
+getFileIcon(filename)         // Get file icon
 ```
 
-## 行为保证
+## Behavior Guarantee
 
-### 1. 消息处理
-- 消息去重(ID和内容双重检查)
-- Markdown 渲染错误处理
-- 代码高亮降级支持
-- 消息类型验证
+### 1. Message Processing
+- Message deduplication (ID and content double check)
+- Markdown rendering error handling
+- Code highlighting downgrade support
+- Message type verification
 
-### 2. 工具调用
-- 工具调用状态同步
-- 自动执行状态管理
-- 轮询更新错误处理
-- 结果展示验证
+### 2. Tool Call
+- Tool call status synchronization
+- Auto execution status management
+- Polling update error handling
+- Result display verification
 
-### 3. UI 渲染
-- DOM 元素缓存优化
-- 加载状态管理
-- 动态内容渲染
-- 错误边界处理
+### 3. UI Rendering
+- DOM element cache optimization
+- Loading status management
+- Dynamic content rendering
+- Error boundary handling
 
-### 4. 状态管理
-- 状态更新原子性
-- 状态访问控制
-- 设置项验证
-- 历史记录维护
+### 4. State Management
+- State update atomicity
+- State access control
+- Setting verification
+- History record maintenance
 
-### 5. API 通信
-- 请求错误重试
-- 响应数据验证
-- 会话状态维护
-- 调试日志记录
+### 5. API Communication
+- Request error retry
+- Response data verification
+- Session status maintenance
+- Debug log recording
 
-### 6. 事件处理
-- 表单状态同步
-- 用户输入验证
-- 键盘事件处理
-- 错误反馈机制
+### 6. Event Handling
+- Form status synchronization
+- User input verification
+- Keyboard event handling
+- Error feedback mechanism
 
-### 7. 配置管理
-- 环境适配
-- 类型定义
-- 常量维护
-- 样式映射
+### 7. Configuration Management
+- Environment adaptation
+- Type definition
+- Constant maintenance
+- Style mapping
 
-### 8. 文件预览
-- 预览安全隔离
-- 渲染性能优化
-- 文件类型验证
-- 错误处理机制
+### 8. File Preview
+- Preview security isolation
+- Rendering performance optimization
+- File type validation
+- Error handling mechanism
 
-### 9. 工具函数
-- 函数纯度保证
-- 错误边界处理
-- 性能优化支持
-- 类型安全保证
+### 9. Utility Functions
+- Function purity guarantee
+- Error boundary handling
+- Performance optimization support
+- Type safety guarantee
 
-## 开发指南
+## Development Guide
 
-### 1. 添加新工具
-1. 在 config.js 中添加工具配置
-2. 在 tools.js 中实现工具处理逻辑
-3. 在 ui.js 中添加相应的UI组件
-4. 更新状态管理相关代码
+### 1. Adding New Tools
+1. Add tool configuration in config.js
+2. Implement tool handling logic in tools.js
+3. Add corresponding UI components in ui.js
+4. Update state management related code
 
-### 2. 修改消息处理
-1. 在 tools.js 的 processAssistantMessage 中处理新消息类型
-2. 在 ui.js 中添加新的渲染逻辑
-3. 更新状态追踪机制
+### 2. Modifying Message Processing
+1. Handle new message types in processAssistantMessage in tools.js
+2. Add new rendering logic in ui.js
+3. Update state tracking mechanism
 
-### 3. 自定义UI组件
-1. 在 elements 对象中添加新元素
-2. 在 initializeUI 中初始化
-3. 实现相应的处理方法
-4. 添加必要的状态管理代码
+### 3. Customizing UI Components
+1. Add new elements in the elements object
+2. Initialize in initializeUI
+3. Implement corresponding handling methods
+4. Add necessary state management code
 
-## 测试要点
+## Testing Points
 
-### 1. 状态管理测试
-- 状态更新正确性
-- 消息去重机制
-- 设置项验证
-- 状态重置功能
+### 1. State Management Testing
+- State update correctness
+- Message deduplication mechanism
+- Settings validation
+- State reset functionality
 
-### 2. 工具调用测试
-- 工具调用解析
-- 自动执行逻辑
-- 轮询更新机制
-- 结果处理流程
+### 2. Tool Call Testing
+- Tool call parsing
+- Auto execution logic
+- Polling update mechanism
+- Result handling process
 
-### 3. UI 渲染测试
-- 消息渲染正确性
-- 加载状态切换
-- 错误处理机制
-- 动态内容更新
+### 3. UI Rendering Testing
+- Message rendering correctness
+- Loading state switching
+- Error handling mechanism
+- Dynamic content updates
 
-### 4. 集成测试
-- 模块间交互
-- 状态同步
-- 错误传播
-- 性能表现 
+### 4. Integration Testing
+- Module interactions
+- State synchronization
+- Error propagation
+- Performance behavior 
