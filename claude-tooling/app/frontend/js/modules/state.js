@@ -35,6 +35,10 @@ class StateManager {
     // Message tracking for duplicate prevention
     this.processedMessageIds = new Set();
     this.processedTextContent = new Set();
+    
+    // Tool tracking for duplicate prevention
+    this.processedToolCalls = new Set();
+    this.processedToolResults = new Set();
   }
   
   /**
@@ -202,6 +206,42 @@ class StateManager {
    */
   addProcessedContent(content) {
     this.processedTextContent.add(content);
+  }
+
+  /**
+   * Track processed tool call
+   * @param {string} toolUseId - Tool use ID to mark as processed
+   */
+  addProcessedToolCall(toolUseId) {
+    this.processedToolCalls.add(toolUseId);
+    console.log(`Marked tool call as processed: ${toolUseId}`);
+  }
+
+  /**
+   * Check if tool call has been processed
+   * @param {string} toolUseId - Tool use ID to check
+   * @returns {boolean} Whether tool has been processed
+   */
+  hasProcessedToolCall(toolUseId) {
+    return this.processedToolCalls.has(toolUseId);
+  }
+
+  /**
+   * Track processed tool result
+   * @param {string} toolUseId - Tool use ID to mark result as processed
+   */
+  addProcessedToolResult(toolUseId) {
+    this.processedToolResults.add(toolUseId);
+    console.log(`Marked tool result as processed: ${toolUseId}`);
+  }
+
+  /**
+   * Check if tool result has been processed
+   * @param {string} toolUseId - Tool use ID to check
+   * @returns {boolean} Whether tool result has been processed
+   */
+  hasProcessedToolResult(toolUseId) {
+    return this.processedToolResults.has(toolUseId);
   }
 }
 

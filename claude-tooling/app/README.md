@@ -55,11 +55,15 @@ The API module provides the core functionality for the application:
      - Command tools (running local commands)
    - Auto-executes tools when requested by Claude
    - Formats tool results for Claude consumption
+   - Asynchronous execution with status updates
+   - Auto-execution limit with manual resume option
 
 3. **Conversation Management**:
    - Creates and manages conversation contexts
    - Stores conversation history and files
    - Provides file access and manipulation within conversations
+   - Progress tracking and status monitoring
+   - Placeholder messages during processing
 
 4. **API Endpoints**:
    - `/api/chat`: Main endpoint for chat interactions
@@ -151,10 +155,49 @@ The frontend provides the user interface for interacting with Claude:
    # Multi-worker mode for better concurrency
    python claude-tooling/run.py --workers 4
    
+   # Use custom port (default is 8000)
+   python claude-tooling/run.py --port 8004
+   
    # Production mode with Gunicorn (Linux/Mac only)
    python claude-tooling/run.py --use-gunicorn --workers 9
    ```
-   The application will be available at `http://localhost:8000`
+   The application will be available at `http://localhost:8000` by default
+
+### Testing
+
+1. **Running Tests**:
+   ```bash
+   # Run all tests
+   python claude-tooling/scripts/run_tests.py
+   
+   # Run specific test groups
+   python claude-tooling/scripts/run_tests.py --api        # API tests only
+   python claude-tooling/scripts/run_tests.py --auto-execute   # Auto-execute tests only
+   
+   # Generate coverage report
+   python claude-tooling/scripts/run_tests.py --coverage
+   ```
+
+2. **Automated Functional Testing**:
+   ```bash
+   # Run all test scenarios
+   python claude-tooling/scripts/automate_test.py
+   
+   # Run specific test categories
+   python claude-tooling/scripts/automate_test.py --tests basic,tool
+   
+   # Run with verbose output
+   python claude-tooling/scripts/automate_test.py --verbose
+   
+   # Use custom port
+   python claude-tooling/scripts/automate_test.py --port 8004
+   ```
+
+3. **Manual Testing**:
+   ```bash
+   # Test auto-execution with a specific query
+   python claude-tooling/scripts/test_auto_execute.py "Plot a sine wave."
+   ```
 
 ### Adding New Tools
 
@@ -164,6 +207,7 @@ To add new tools for Claude:
 2. Add tool definition to `TOOL_DEFINITIONS` in `tool_wrapper.py`
 3. Implement execution logic in the appropriate service
 4. Update the frontend to handle the new tool type if needed
+5. Add tests for the new tool functionality
 
 ### Security Considerations
 
@@ -174,11 +218,15 @@ To add new tools for Claude:
 ## Behavior Guarantees
 
 - Tool execution uses background tasks for asynchronous processing
-- Frontend polls for updates during tool execution
-- Tool execution can be cancelled by the user
+- Frontend polls for updates during tool execution with detailed progress information
+- Tool execution can be cancelled by the user at any time
 - All API responses include proper error handling
 - File operations are constrained to conversation directories
 - Command execution can be configured to require manual approval
 - Thinking mode support for seeing Claude's reasoning process
 - Automatic file detection identifies created files from commands
-- Enhanced file metadata for better rendering in the frontend 
+- Enhanced file metadata for better rendering in the frontend
+- Proper handling of conversation history with system messages
+- Sequential tool execution with status updates for each step
+- Automatic validation of the conversation structure for Claude API compatibility
+- Appropriate error recovery with helpful system messages 

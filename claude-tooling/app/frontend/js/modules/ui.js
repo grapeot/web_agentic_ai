@@ -97,16 +97,25 @@ function setToolsLoading(isLoading) {
 /**
  * Set auto-execution indicator visibility
  * @param {boolean} visible - Whether the indicator should be visible
+ * @param {string} status - Current execution status
  */
-function setAutoExecutionIndicator(visible) {
+function setAutoExecutionIndicator(visible, status) {
   if (elements.autoExecutionIndicator) {
     elements.autoExecutionIndicator.style.display = visible ? 'block' : 'none';
     
     // Update the text content based on the state
     if (visible) {
-      const label = elements.autoExecutionIndicator.querySelector('span');
+      const label = elements.autoExecutionIndicator.querySelector('span#auto-execution-status');
       if (label) {
-        label.textContent = 'Auto-executing tool...';
+        if (status === "waiting_for_claude") {
+          label.textContent = 'Waiting for Claude to respond...';
+        } else if (status === "executing_tool") {
+          label.textContent = 'Executing tool...';
+        } else if (status === "in_progress") {
+          label.textContent = 'Processing...';
+        } else {
+          label.textContent = 'Auto-executing tools...';
+        }
       }
       
       // Show cancel button
@@ -114,6 +123,71 @@ function setAutoExecutionIndicator(visible) {
       if (cancelButton) {
         cancelButton.style.display = 'inline-block';
       }
+    }
+  }
+}
+
+/**
+ * Update progress indicator with detailed progress information
+ * @param {Object} progress - Progress information object
+ */
+function updateProgressIndicator(progress) {
+  if (!progress) return;
+  
+  const statusElement = document.getElementById('auto-execution-status');
+  if (!statusElement) return;
+  
+  // Update status message
+  if (progress.message) {
+    statusElement.textContent = progress.message;
+    
+    // Update status color based on status
+    statusElement.className = 'status-indicator';
+    if (progress.status === 'error') {
+      statusElement.classList.add('error');
+    } else if (progress.status === 'waiting_for_claude') {
+      statusElement.classList.add('waiting');
+    } else if (progress.status === 'executing_tool') {
+      statusElement.classList.add('running');
+    } else if (progress.status === 'paused') {
+      statusElement.classList.add('paused');
+    } else if (progress.status === 'completed') {
+      statusElement.classList.add('completed');
+    }
+  }
+  
+  // Add progress bar if we have percentage and it's not complete or error
+  if (progress.progress_pct !== undefined && 
+      progress.status !== 'completed' && 
+      progress.status !== 'error') {
+    
+    // Check if progress bar already exists
+    let progressBar = document.getElementById('execution-progress-bar');
+    if (!progressBar) {
+      // Create progress bar container
+      const progressContainer = document.createElement('div');
+      progressContainer.className = 'progress-container';
+      progressContainer.id = 'execution-progress-container';
+      
+      // Create progress bar
+      progressBar = document.createElement('div');
+      progressBar.className = 'progress-bar';
+      progressBar.id = 'execution-progress-bar';
+      
+      // Append to container
+      progressContainer.appendChild(progressBar);
+      
+      // Insert after status element
+      statusElement.parentNode.insertBefore(progressContainer, statusElement.nextSibling);
+    }
+    
+    // Update progress bar width
+    progressBar.style.width = `${progress.progress_pct}%`;
+  } else if (progress.status === 'completed' || progress.status === 'error') {
+    // Remove progress bar if completed or error
+    const progressContainer = document.getElementById('execution-progress-container');
+    if (progressContainer) {
+      progressContainer.remove();
     }
   }
 }

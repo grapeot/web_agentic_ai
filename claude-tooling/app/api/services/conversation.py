@@ -5,6 +5,7 @@ Conversation management services.
 import os
 import datetime
 import logging
+import asyncio
 from typing import Dict, List, Any, Optional
 
 # Configure logging
@@ -19,6 +20,10 @@ conversations = {}
 conversation_root_dirs = {}
 auto_execute_tasks = {}
 auto_execute_counts = {}  # Track the number of automatic tool executions per conversation
+
+# Progress tracking for Claude API requests and tool executions
+request_progress = {}  # Detailed progress tracking per conversation
+request_locks = {}  # Locks to prevent race conditions when updating progress
 
 def create_conversation_root_dir(conversation_id: str) -> str:
     """
@@ -107,6 +112,54 @@ def set_task_status(conversation_id: str, status: str) -> None:
         status: The task status
     """
     auto_execute_tasks[conversation_id] = status
+    
+async def get_request_progress(conversation_id: str) -> Dict[str, Any]:
+    """
+    Get detailed progress information for a conversation.
+    
+    Args:
+        conversation_id: The conversation ID
+        
+    Returns:
+        Dictionary with detailed progress information
+    """
+    if conversation_id not in request_progress:
+        return {
+            "status": "unknown",
+            "step": "",
+            "message": "",
+            "progress_pct": 0,
+            "timestamp": datetime.datetime.now().isoformat()
+        }
+    return request_progress[conversation_id]
+
+async def update_progress(conversation_id: str, status: str, step: str, message: str, progress_pct: int = 0) -> None:
+    """
+    Update detailed progress information for a conversation.
+    
+    Args:
+        conversation_id: The conversation ID
+        status: Current status (running, waiting_for_claude, executing_tool, paused, etc.)
+        step: Current execution step
+        message: Human-readable progress message
+        progress_pct: Progress percentage (0-100)
+    """
+    # Ensure we have a lock for this conversation
+    if conversation_id not in request_locks:
+        request_locks[conversation_id] = asyncio.Lock()
+    
+    # Use lock to prevent race conditions
+    async with request_locks[conversation_id]:
+        request_progress[conversation_id] = {
+            "status": status,
+            "step": step,
+            "message": message,
+            "progress_pct": progress_pct,
+            "timestamp": datetime.datetime.now().isoformat()
+        }
+        
+        # Also update the main task status
+        set_task_status(conversation_id, status)
     
 def get_auto_execute_count(conversation_id: str) -> int:
     """

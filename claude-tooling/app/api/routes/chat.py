@@ -4,8 +4,10 @@ Chat API routes for interacting with Claude.
 
 import os
 import logging
-import time
 import json
+import datetime
+import time
+import asyncio
 from typing import Dict, List, Any, Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Request, Depends
 
@@ -90,8 +92,18 @@ async def chat(request: UserRequest, background_tasks: BackgroundTasks, conversa
                     "content": [{"type": "text", "text": content_list}]
                 })
         
-        # Make the API call to Claude
+        # Make the API call to Claude, but do it asynchronously
         logger.info("Sending request to Claude API")
+        
+        # Set initial progress status
+        from ..services.conversation import update_progress
+        await update_progress(
+            conversation_id,
+            "waiting_for_claude",
+            "api_request",
+            "Waiting for Claude's response...",
+            10
+        )
         
         # Prepare thinking parameter if thinking mode is enabled
         thinking_param = None
@@ -105,7 +117,9 @@ async def chat(request: UserRequest, background_tasks: BackgroundTasks, conversa
             temperature_param = 1.0
             logger.info("Thinking mode enabled, setting temperature to 1.0")
         
-        response = client.messages.create(
+        # Create a task for the API call
+        response = await asyncio.to_thread(
+            client.messages.create,
             model="claude-3-7-sonnet-20250219",
             system=system_content,
             messages=api_messages,
@@ -113,6 +127,15 @@ async def chat(request: UserRequest, background_tasks: BackgroundTasks, conversa
             temperature=temperature_param,
             tools=TOOL_DEFINITIONS,
             thinking=thinking_param,
+        )
+        
+        # Update progress after getting response
+        await update_progress(
+            conversation_id,
+            "processing_response",
+            "parsing_response",
+            "Processing Claude's response...",
+            50
         )
         
         logger.info("Received response from Claude API")
@@ -185,6 +208,22 @@ async def chat(request: UserRequest, background_tasks: BackgroundTasks, conversa
         # If auto-execute tools is enabled and there are tool calls, process them in the background
         if request.auto_execute_tools and tool_calls:
             logger.info("Automatic tool execution enabled, starting tool task")
+            
+            # Add a system message indicating tool execution is starting
+            # This gives the frontend immediate feedback while the background task runs
+            tool_names = ", ".join([t.get("name", "unknown") for t in tool_calls[:3]])
+            if len(tool_calls) > 3:
+                tool_names += f" and {len(tool_calls) - 3} more"
+                
+            add_message_to_conversation(
+                conversation_id,
+                {
+                    "role": "system",
+                    "content": [{"type": "text", "text": f"Executing tools: {tool_names}"}],
+                    "id": f"tool_exec_start_{int(datetime.datetime.now().timestamp())}",
+                    "is_status": True
+                }
+            )
             
             # Create a background task to handle tool calls and continue conversation
             background_tasks.add_task(
