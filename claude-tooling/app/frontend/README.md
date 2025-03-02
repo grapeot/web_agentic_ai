@@ -335,9 +335,9 @@ const DEFAULT_SETTINGS = {      // Default settings
 ```
 
 **UI Constants:**
-- Message type definition
-- Role type definition
-- File preview configuration
+- Message type definition (TEXT, THINKING, TOOL_CALLS)
+- Role type definition (USER, ASSISTANT, SYSTEM)
+- Tool display constants (arrows, initial state)
 - CSS class name mapping
 
 ### 8. File Preview (filePreview.js)
@@ -375,46 +375,46 @@ General purpose function set:
 
 **String Processing:**
 ```javascript
-escapeHtml(text)              // HTML special character escaping
-cleanLineBreaks(text)         // Clean up extra line breaks
-getFileName(path)             // Get file name
-getFileExtension(filename)    // Get file extension
+// ui.js contains the central escapeHtml function
+escapeHtml(text)              // HTML special character escaping (in ui.js)
 ```
 
-**JSON Processing:**
+**File Display Functions:**
 ```javascript
-safeJsonParse(str, default)   // Safe JSON parsing
-safeJsonStringify(val, indent) // Safe JSON stringification
-deepClone(obj)                // Deep clone object
+fetchAndDisplayMarkdown(url, container)  // Fetch and display markdown
+displayHtmlPreview(url, container)       // Secure HTML preview with iframe
 ```
 
-**Performance Optimization:**
+**Security and Error Handling:**
 ```javascript
-debounce(func, wait)          // Function debounce
-throttle(func, limit)         // Function throttle
+// Error handling in file previews and tool results
+showError(message)            // Error message display
 ```
 
-**File Processing:**
+**Tool Result Processing:**
 ```javascript
-getFileType(filename)         // Get file type
-getFileIcon(filename)         // Get file icon
+processFileResults(result)    // Format file results for display
+generateFilePreview(file)     // Generate secure file preview
 ```
 
 ## Behavior Guarantee
 
 ### 1. Message Processing
 - Message deduplication (ID and content double check)
-- Text content escaping for security
-- Line break preservation
+- Text content escaping for security using escapeHtml()
+- Line break preservation with \n to <br> conversion
+- HTML content handling with iframe sandboxes for safety
 - Message type verification
 
 ### 2. Tool Call
 - Tool call status synchronization
-- Auto execution status management
+- Auto execution status management with cancel option
 - Polling update error handling
 - Result display verification
 - Reliable tool completion detection
 - Accurate auto-execution indicator state
+- Collapsible tool calls with preview/expand options
+- Tool result security with content sanitization
 
 ### 3. UI Rendering
 - DOM element cache optimization
@@ -447,11 +447,13 @@ getFileIcon(filename)         // Get file icon
 - Style mapping
 
 ### 8. File Preview
-- Preview security isolation
-- Rendering performance optimization
-- File type validation
+- Preview security isolation with iframe sandboxing
+- Markdown and HTML content handling
+- Enhanced file preview with toggle buttons
+- File type validation and appropriate rendering
 - Error handling mechanism
 - Automatic detection and display of generated files
+- Support for viewing and downloading generated content
 
 ### 9. Utility Functions
 - Function purity guarantee
