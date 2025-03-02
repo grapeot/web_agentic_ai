@@ -175,11 +175,16 @@ function addMessageToChat(role, content, type) {
   
   // Extract the actual text content
   let textContent = '';
+  let isHtml = false;
+  
   if (typeof content === 'string') {
     textContent = content;
   } else if (content && typeof content === 'object') {
     if (Array.isArray(content)) {
       // Handle array of content blocks
+      // Check if any content blocks have HTML format
+      isHtml = content.some(block => block.format === 'html');
+      
       textContent = content
         .filter(block => block.type === 'text' && block.text)
         .map(block => block.text)
@@ -187,12 +192,15 @@ function addMessageToChat(role, content, type) {
     } else if (content.type === 'text' && content.text) {
       // Handle single content object with type and text fields
       textContent = content.text;
+      isHtml = content.format === 'html';
     } else if (content.content) {
       // Handle object with direct content field
       textContent = content.content;
+      isHtml = content.format === 'html';
     } else if (content.text) {
       // Handle object with direct text field
       textContent = content.text;
+      isHtml = content.format === 'html';
     }
   }
   
@@ -210,23 +218,28 @@ function addMessageToChat(role, content, type) {
   // Mark this content as processed to prevent duplicates
   state.addProcessedContent(textContent.trim());
   
-  // Function to render markdown content
-  const renderMarkdown = () => {
+  // Function to render content
+  const renderContent = () => {
     try {
-      // Simple plain text rendering - no markdown, escape HTML for security
-      const safeText = escapeHtml(textContent).replace(/\n/g, '<br>');
-      messageDiv.innerHTML = safeText;
-      
-      // We can't apply syntax highlighting anymore since we're escaping everything
+      if (isHtml) {
+        // For HTML content (preprocessed on backend)
+        console.log('Rendering as HTML content');
+        messageDiv.innerHTML = textContent;
+      } else {
+        // Simple plain text rendering - escape HTML for security
+        console.log('Rendering as plain text');
+        const safeText = escapeHtml(textContent).replace(/\n/g, '<br>');
+        messageDiv.innerHTML = safeText;
+      }
     } catch (error) {
-      console.error('Error parsing text:', error);
+      console.error('Error rendering content:', error);
       // Fallback to plain text with line breaks
       messageDiv.innerHTML = escapeHtml(textContent).replace(/\n/g, '<br>');
     }
   };
 
   // Render content immediately
-  renderMarkdown();
+  renderContent();
   
   // No need for delayed rendering since we're not using marked
   

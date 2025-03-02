@@ -45,6 +45,7 @@ The API module provides the core functionality for the application:
    - Connects to Claude 3.7 through Anthropic's API
    - Manages conversation state and history
    - Processes tool calls from Claude
+   - Converts Markdown responses to HTML for better rendering
 
 2. **Tool Framework**:
    - Implements various tools Claude can use:
@@ -102,6 +103,7 @@ The frontend provides the user interface for interacting with Claude:
    - `conversation.py`: Manages conversation state and storage
    - `file_service.py`: Handles file operations
    - `tool_execution.py`: Processes and executes tool calls
+   - `markdown_service.py`: Detects and converts Markdown to HTML
 
 5. **Tools**:
    - `tool_wrapper.py`: Defines the tool interface for Claude
@@ -118,6 +120,28 @@ The frontend provides the user interface for interacting with Claude:
    - REST API calls for chat interaction
    - Tool execution approval flow
    - File management operations
+
+### Markdown Processing Pipeline
+
+The application implements a backend Markdown-to-HTML conversion pipeline to ensure proper rendering of formatted content:
+
+1. **Detection and Conversion**:
+   - Automatically detects if content is likely to be Markdown
+   - Converts Markdown to HTML using the markdown2 library
+   - Sanitizes HTML output with bleach to prevent XSS attacks
+   - Preserves line breaks and code formatting
+
+2. **Response Processing**:
+   - Chat API endpoints process all response content
+   - Adds format metadata to converted content
+   - Frontend renders HTML or plain text based on format indicators
+
+3. **Security Measures**:
+   - HTML content is sanitized to prevent XSS attacks
+   - Only specific HTML tags and attributes are allowed
+   - Plain text is safely escaped if not identified as Markdown
+
+This approach allows the application to handle LLM-generated Markdown content properly while maintaining security best practices.
 
 ## Development Guide
 

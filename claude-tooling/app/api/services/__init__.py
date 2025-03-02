@@ -8,4 +8,5 @@ from .conversation import (
     add_message_to_conversation, get_task_status, set_task_status
 )
 from .tool_execution import auto_execute_tool_calls, process_tool_calls_and_continue
-from .file_service import get_file_path, get_file_content_type, list_files 
+from .file_service import get_file_path, get_file_content_type, list_files
+from .markdown_service import MarkdownService 

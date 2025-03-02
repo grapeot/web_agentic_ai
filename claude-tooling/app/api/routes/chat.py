@@ -16,6 +16,7 @@ from ..services.conversation import (
     get_conversation, get_root_dir, get_task_status, set_task_status
 )
 from ..services.tool_execution import process_tool_calls_and_continue, auto_execute_tool_calls
+from ..services.markdown_service import MarkdownService
 from ..tools.tool_wrapper import TOOL_DEFINITIONS, format_tool_results_for_claude
 
 # Configure logging
@@ -204,8 +205,15 @@ async def chat(request: UserRequest, background_tasks: BackgroundTasks, conversa
             tool_calls_for_response = tool_calls
         
         # Prepare the response
+        # Process Markdown content before returning
+        if content:
+            processed_content = MarkdownService.process_message_content(content)
+            logger.debug(f"Processed message content with Markdown conversion")
+        else:
+            processed_content = content
+
         return UserResponse(
-            message=Message(role="assistant", content=content),
+            message=Message(role="assistant", content=processed_content),
             conversation_id=conversation_id,
             tool_calls=tool_calls_for_response,
             thinking=thinking
@@ -339,12 +347,21 @@ async def submit_tool_results(
                 client
             )
         
-        # Prepare the response
-        return UserResponse(
-            message=Message(role="assistant", content=content),
-            conversation_id=conversation_id,
-            tool_calls=tool_calls
+        # Process the tool result with Claude
+        logger.info(f"Processing tool result for conversation {conversation_id}")
+        result = await process_tool_calls_and_continue(
+            conversation_id, 
+            tool_output.tool_use_id, 
+            tool_output.content,
+            background_tasks=background_tasks if auto_execute_tools else None
         )
+        
+        # Process Markdown content in message before returning
+        if "message" in result and result["message"] and "content" in result["message"]:
+            processed_content = MarkdownService.process_message_content(result["message"]["content"])
+            result["message"]["content"] = processed_content
+            
+        return UserResponse(**result)
         
     except Exception as e:
         logger.error(f"Error processing tool results: {str(e)}")
