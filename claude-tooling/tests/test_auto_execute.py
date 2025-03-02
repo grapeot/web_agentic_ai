@@ -27,7 +27,7 @@ if parent_dir not in sys.path:
 
 # Import the functions to test
 from app.api.services.tool_execution import auto_execute_tool_calls, process_tool_calls_and_continue
-from app.api.services.conversation import conversations, auto_execute_tasks
+from app.api.services.conversation import conversations, auto_execute_tasks, auto_execute_counts, get_auto_execute_count, increment_auto_execute_count, reset_auto_execute_count
 from app.api.routes.chat import client
 
 # Sample tool call for testing
@@ -108,6 +108,7 @@ def cleanup():
     for key in keys_to_remove:
         conversations.pop(key, None)
         auto_execute_tasks.pop(key, None)
+        auto_execute_counts.pop(key, None)
 
 # Tests for auto_execute_tool_calls
 @pytest.mark.asyncio
@@ -306,6 +307,124 @@ async def test_recursive_tool_calls():
     finally:
         # Restore the original function
         tool_execution_module.process_tool_calls = original_func
+
+# Tests for auto execution limit
+def test_auto_execute_count_functions():
+    """Test functions for tracking auto execution counts"""
+    # Setup
+    conversation_id = f"test_{uuid.uuid4()}"
+    
+    # Test initial count is 0
+    assert get_auto_execute_count(conversation_id) == 0
+    
+    # Test increment increases count
+    assert increment_auto_execute_count(conversation_id) == 1
+    assert increment_auto_execute_count(conversation_id) == 2
+    assert increment_auto_execute_count(conversation_id) == 3
+    
+    # Test get function returns current count
+    assert get_auto_execute_count(conversation_id) == 3
+    
+    # Test reset function
+    reset_auto_execute_count(conversation_id)
+    assert get_auto_execute_count(conversation_id) == 0
+
+@pytest.mark.asyncio
+async def test_process_tool_calls_with_limit():
+    """Test the counter functions directly for the auto tool limit feature"""
+    # Create test data
+    conversation_id = f"test_{uuid.uuid4()}"
+    
+    # Test counter starts at 0
+    assert get_auto_execute_count(conversation_id) == 0
+    
+    # Increment to just before the limit
+    for i in range(10):
+        increment_auto_execute_count(conversation_id)
+    assert get_auto_execute_count(conversation_id) == 10
+    
+    # One more increment should put us over the limit
+    assert increment_auto_execute_count(conversation_id) == 11
+    
+    # Reset should put it back to 0
+    reset_auto_execute_count(conversation_id)
+    assert get_auto_execute_count(conversation_id) == 0
+    
+    # Test with multiple conversations
+    conversation_id2 = f"test_{uuid.uuid4()}"
+    assert increment_auto_execute_count(conversation_id) == 1
+    assert increment_auto_execute_count(conversation_id2) == 1
+    assert get_auto_execute_count(conversation_id) == 1
+    assert get_auto_execute_count(conversation_id2) == 1
+    
+    # Reset one conversation shouldn't affect the other
+    reset_auto_execute_count(conversation_id)
+    assert get_auto_execute_count(conversation_id) == 0
+    assert get_auto_execute_count(conversation_id2) == 1
+
+@pytest.mark.asyncio
+async def test_resume_after_limit(mock_anthropic_client):
+    """Test resuming execution after hitting the limit"""
+    # Create test data
+    conversation_id = f"test_{uuid.uuid4()}"
+    
+    # Setup conversation with tool calls and paused status
+    conversations[conversation_id] = [
+        {"role": "user", "content": [{"type": "text", "text": "Test message"}]},
+        {"role": "assistant", "content": [
+            {"type": "text", "text": "Initial response"},
+            {"type": "tool_use", "id": "tool_call_67890", "name": "python_interpreter", "input": {"code": "print('Another call')"}}
+        ]}
+    ]
+    
+    # Set status to paused and auto execute count to beyond limit
+    auto_execute_tasks[conversation_id] = "paused"
+    for i in range(11):
+        increment_auto_execute_count(conversation_id)
+    
+    # Import the resume function
+    from app.api.routes.conversation import resume_auto_execution
+    
+    # Test resume functionality
+    from fastapi import BackgroundTasks
+    background_tasks = BackgroundTasks()
+    
+    # Patch the background_tasks.add_task to avoid actually calling it
+    with patch.object(background_tasks, 'add_task') as mock_add_task:
+        # Call resume function
+        from fastapi import HTTPException
+        # Mock the add_message_to_conversation function to prevent errors
+        with patch('app.api.routes.conversation.add_message_to_conversation') as mock_add_message:
+            with patch('app.api.routes.conversation.process_tool_calls_and_continue') as mock_process:
+                # Mock the client in conversation router
+                from app.api.routes.conversation import client
+                old_client = client
+                from app.api.routes.conversation import set_anthropic_client
+                set_anthropic_client(mock_anthropic_client)
+                
+                try:
+                    result = await resume_auto_execution(
+                        conversation_id=conversation_id,
+                        background_tasks=background_tasks
+                    )
+                    
+                    # Check counter was reset
+                    assert get_auto_execute_count(conversation_id) == 0
+                    
+                    # Check status was updated
+                    assert auto_execute_tasks[conversation_id] == "running"
+                    
+                    # Check background task was called
+                    mock_add_task.assert_called_once()
+                    
+                    # Check success message
+                    assert result["status"] == "success"
+                    
+                except HTTPException as e:
+                    pytest.fail(f"resume_auto_execution raised HTTPException: {str(e)}")
+                
+                # Restore the original client
+                set_anthropic_client(old_client)
 
 if __name__ == "__main__":
     pytest.main(["-v", __file__]) 
