@@ -4,12 +4,15 @@ Conversation management routes.
 
 import logging
 from typing import Dict, Any
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 
 from ..services.conversation import (
-    conversations, get_conversation, get_root_dir
+    conversations, get_conversation, get_root_dir,
+    set_task_status, get_task_status, reset_auto_execute_count,
+    add_message_to_conversation
 )
 from ..services.file_service import list_files, get_file_path, get_file_content_type
+from ..services.tool_execution import process_tool_calls_and_continue
 
 # Configure logging
 logging.basicConfig(
@@ -20,6 +23,15 @@ logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/api/conversation")
+
+# Anthropic client - will be set from app.py
+client = None
+
+def set_anthropic_client(anthropic_client):
+    """Set the Anthropic client for this module"""
+    global client
+    client = anthropic_client
+    logger.info("Anthropic client set in conversation router")
 
 @router.get("/{conversation_id}/messages")
 async def get_conversation_messages(conversation_id: str):
@@ -37,21 +49,28 @@ async def get_conversation_messages(conversation_id: str):
         # Get conversation history
         history = get_conversation(conversation_id)
         
-        # Check conversation status
-        # Find the last message, if it's assistant message and no tool calls, then consider conversation completed
-        status = "in_progress"
-        if history and len(history) > 0:
-            last_message = history[-1]
-            if last_message["role"] == "assistant":
-                # Check if there are tool calls
-                has_tool_call = False
-                for item in last_message["content"]:
-                    if isinstance(item, dict) and item.get("type") == "tool_use":
-                        has_tool_call = True
-                        break
-                
-                if not has_tool_call:
-                    status = "completed"
+        # Check conversation status from auto_execute_tasks first
+        task_status = get_task_status(conversation_id)
+        
+        if task_status == "paused":
+            # Tool execution is paused (hit the limit)
+            status = "paused"
+        else:
+            # Check messages to determine status
+            # Find the last message, if it's assistant message and no tool calls, then consider conversation completed
+            status = "in_progress"
+            if history and len(history) > 0:
+                last_message = history[-1]
+                if last_message["role"] == "assistant":
+                    # Check if there are tool calls
+                    has_tool_call = False
+                    for item in last_message["content"]:
+                        if isinstance(item, dict) and item.get("type") == "tool_use":
+                            has_tool_call = True
+                            break
+                    
+                    if not has_tool_call:
+                        status = "completed"
         
         # Get the conversation root directory if available
         root_dir = get_root_dir(conversation_id)
@@ -113,4 +132,109 @@ async def list_conversation_files(conversation_id: str):
         logger.error(f"[FILE LISTING] Error listing files: {str(e)}")
         import traceback
         logger.error(f"[FILE LISTING] Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Error listing files: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error listing files: {str(e)}")
+        
+@router.post("/{conversation_id}/resume")
+async def resume_auto_execution(
+    conversation_id: str,
+    background_tasks: BackgroundTasks,
+    max_tokens: int = 4096,
+    thinking_mode: bool = True,
+    thinking_budget_tokens: int = 2000
+):
+    """
+    Resume automatic tool execution after reaching the limit.
+    """
+    try:
+        logger.info(f"Received resume automatic execution request, conversation ID: {conversation_id}")
+        
+        if conversation_id not in conversations:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        # Get the current status
+        status = get_task_status(conversation_id)
+        if status != "paused":
+            raise HTTPException(status_code=400, detail=f"Cannot resume execution, status is {status}")
+        
+        # Reset the counter and set status back to running
+        reset_auto_execute_count(conversation_id)
+        set_task_status(conversation_id, "running")
+        
+        # Add system message to conversation history
+        from ..services.conversation import add_message_to_conversation as add_msg
+        add_msg(
+            conversation_id,
+            {
+                "role": "system", 
+                "content": [{"type": "text", "text": "Automatic tool execution resumed by user"}]
+            }
+        )
+        
+        # Get the tool calls from the last assistant message
+        history = get_conversation(conversation_id)
+        recent_messages = [m for m in history if m["role"] == "assistant"]
+        
+        if not recent_messages:
+            raise HTTPException(status_code=400, detail="No assistant messages found")
+        
+        last_assistant_message = recent_messages[-1]
+        content = last_assistant_message.get("content", [])
+        
+        tool_calls = []
+        for item in content:
+            if isinstance(item, dict) and item.get('type') == 'tool_use':
+                tool_calls.append({
+                    "id": item.get('id'),
+                    "name": item.get('name'),
+                    "input": item.get('input', {})
+                })
+        
+        if not tool_calls:
+            raise HTTPException(status_code=400, detail="No tool calls found in last assistant message")
+        
+        # Start a background task to continue processing the tool calls
+        background_tasks.add_task(
+            process_tool_calls_and_continue, 
+            tool_calls, 
+            conversation_id, 
+            max_tokens, 
+            thinking_mode, 
+            thinking_budget_tokens,
+            True,  # auto_execute_tools
+            client
+        )
+        
+        return {"status": "success", "message": "Automatic tool execution resumed"}
+        
+    except Exception as e:
+        logger.error(f"Error resuming automatic execution: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+        
+@router.post("/{conversation_id}/cancel")
+async def cancel_auto_execution(conversation_id: str):
+    """
+    Cancel ongoing automatic tool execution.
+    Allows user to interrupt long-running automatic tool execution process.
+    """
+    try:
+        logger.info(f"Received cancel automatic execution request, conversation ID: {conversation_id}")
+        
+        if conversation_id not in conversations:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        set_task_status(conversation_id, "cancelled")
+        
+        # Add system message to conversation history
+        add_message_to_conversation(
+            conversation_id,
+            {
+                "role": "system", 
+                "content": [{"type": "text", "text": "Automatic tool execution cancelled by user"}]
+            }
+        )
+        
+        return {"status": "success", "message": "Automatic tool execution cancelled"}
+        
+    except Exception as e:
+        logger.error(f"Error cancelling automatic execution: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e)) 

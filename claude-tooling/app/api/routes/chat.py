@@ -13,7 +13,8 @@ from ..models.schemas import Message, UserRequest, UserResponse, ToolOutput
 from ..services.conversation import (
     conversations, conversation_root_dirs, 
     create_conversation_root_dir, add_message_to_conversation,
-    get_conversation, get_root_dir, get_task_status, set_task_status
+    get_conversation, get_root_dir, get_task_status, set_task_status,
+    reset_auto_execute_count
 )
 from ..services.tool_execution import process_tool_calls_and_continue, auto_execute_tool_calls
 from ..tools.tool_wrapper import TOOL_DEFINITIONS, format_tool_results_for_claude

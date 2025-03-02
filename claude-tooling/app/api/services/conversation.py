@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 conversations = {}
 conversation_root_dirs = {}
 auto_execute_tasks = {}
+auto_execute_counts = {}  # Track the number of automatic tool executions per conversation
 
 def create_conversation_root_dir(conversation_id: str) -> str:
     """
@@ -105,4 +106,41 @@ def set_task_status(conversation_id: str, status: str) -> None:
         conversation_id: The conversation ID
         status: The task status
     """
-    auto_execute_tasks[conversation_id] = status 
+    auto_execute_tasks[conversation_id] = status
+    
+def get_auto_execute_count(conversation_id: str) -> int:
+    """
+    Get the count of automatic tool executions for a conversation.
+    
+    Args:
+        conversation_id: The conversation ID
+        
+    Returns:
+        The count or 0 if not found
+    """
+    return auto_execute_counts.get(conversation_id, 0)
+
+def increment_auto_execute_count(conversation_id: str) -> int:
+    """
+    Increment the count of automatic tool executions for a conversation.
+    
+    Args:
+        conversation_id: The conversation ID
+        
+    Returns:
+        The new count
+    """
+    if conversation_id not in auto_execute_counts:
+        auto_execute_counts[conversation_id] = 0
+    
+    auto_execute_counts[conversation_id] += 1
+    return auto_execute_counts[conversation_id]
+
+def reset_auto_execute_count(conversation_id: str) -> None:
+    """
+    Reset the count of automatic tool executions for a conversation.
+    
+    Args:
+        conversation_id: The conversation ID
+    """
+    auto_execute_counts[conversation_id] = 0 
