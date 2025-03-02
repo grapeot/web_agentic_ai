@@ -8,7 +8,8 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 
 from ..services.conversation import (
     conversations, get_conversation, get_root_dir,
-    set_task_status, get_task_status, reset_auto_execute_count
+    set_task_status, get_task_status, reset_auto_execute_count,
+    add_message_to_conversation
 )
 from ..services.file_service import list_files, get_file_path, get_file_content_type
 from ..services.tool_execution import process_tool_calls_and_continue
@@ -160,7 +161,8 @@ async def resume_auto_execution(
         set_task_status(conversation_id, "running")
         
         # Add system message to conversation history
-        add_message_to_conversation(
+        from ..services.conversation import add_message_to_conversation as add_msg
+        add_msg(
             conversation_id,
             {
                 "role": "system", 

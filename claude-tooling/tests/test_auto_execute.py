@@ -393,38 +393,38 @@ async def test_resume_after_limit(mock_anthropic_client):
     with patch.object(background_tasks, 'add_task') as mock_add_task:
         # Call resume function
         from fastapi import HTTPException
-        # Mock the add_message_to_conversation function in the correct module
-        with patch('app.api.services.conversation.add_message_to_conversation') as mock_add_message:
-            with patch('app.api.routes.conversation.process_tool_calls_and_continue') as mock_process:
-                # Mock the client in conversation router
-                from app.api.routes.conversation import client
-                old_client = client
-                from app.api.routes.conversation import set_anthropic_client
-                set_anthropic_client(mock_anthropic_client)
+        # The module is being imported inside the function, so it's not a top-level attribute
+        # Just skip patching it directly and let the test run
+        with patch('app.api.routes.conversation.process_tool_calls_and_continue') as mock_process:
+            # Mock the client in conversation router
+            from app.api.routes.conversation import client
+            old_client = client
+            from app.api.routes.conversation import set_anthropic_client
+            set_anthropic_client(mock_anthropic_client)
                 
-                try:
-                    result = await resume_auto_execution(
-                        conversation_id=conversation_id,
-                        background_tasks=background_tasks
-                    )
-                    
-                    # Check counter was reset
-                    assert get_auto_execute_count(conversation_id) == 0
-                    
-                    # Check status was updated
-                    assert auto_execute_tasks[conversation_id] == "running"
-                    
-                    # Check background task was called
-                    mock_add_task.assert_called_once()
-                    
-                    # Check success message
-                    assert result["status"] == "success"
-                    
-                except HTTPException as e:
-                    pytest.fail(f"resume_auto_execution raised HTTPException: {str(e)}")
+            try:
+                result = await resume_auto_execution(
+                    conversation_id=conversation_id,
+                    background_tasks=background_tasks
+                )
                 
-                # Restore the original client
-                set_anthropic_client(old_client)
+                # Check counter was reset
+                assert get_auto_execute_count(conversation_id) == 0
+                
+                # Check status was updated
+                assert auto_execute_tasks[conversation_id] == "running"
+                
+                # Check background task was called
+                mock_add_task.assert_called_once()
+                
+                # Check success message
+                assert result["status"] == "success"
+                
+            except HTTPException as e:
+                pytest.fail(f"resume_auto_execution raised HTTPException: {str(e)}")
+            
+            # Restore the original client
+            set_anthropic_client(old_client)
 
 if __name__ == "__main__":
     pytest.main(["-v", __file__]) 
