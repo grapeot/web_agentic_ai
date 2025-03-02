@@ -47,6 +47,24 @@ WARNING: the project is mainly for demo purpose only, not for production use. It
 - **Conversation Root Directories** - Each conversation is automatically assigned a unique directory in `runs/<timestamp>` for better organization of generated files
 - **Server Concurrency** - Support for multiple workers to handle concurrent requests for better performance
 - **Enhanced UI for Tool Calls** - Collapsible tool calls with clear visualization of inputs and results, automatic expansion when results arrive, and visual indicators for completed tool executions
+- **Modular Frontend Architecture** - Well-structured frontend code with clear separation of concerns for better maintainability and extensibility
+- **Reliable Tool Completion Detection** - Improved tracking of tool execution status and accurate auto-execution indicator management
+
+## Frontend Architecture
+
+The frontend code follows a modular architecture with clear separation of concerns:
+
+- **state.js** - Centralized state management using a singleton pattern
+- **api.js** - API communication layer for backend interaction
+- **tools.js** - Tool call handling and auto-execution management
+- **ui.js** - User interface rendering and DOM operations
+- **events.js** - Event handling and user interaction processing
+- **config.js** - Configuration constants and settings
+- **filePreview.js** - File preview functionality for generated files
+- **utils.js** - Utility functions for common operations
+- **main.js** - Application initialization and coordination
+
+See [frontend/README.md](claude-tooling/app/frontend/README.md) for detailed documentation of the frontend architecture.
 
 ## Testing
 

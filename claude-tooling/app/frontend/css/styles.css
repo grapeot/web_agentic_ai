@@ -92,7 +92,7 @@ body {
     display: flex;
     flex-direction: column;
     max-width: calc(100% - 300px);
-    margin: 1rem;
+    margin: 1rem 1rem 1rem 2rem;
     background-color: var(--card-bg);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-sm);

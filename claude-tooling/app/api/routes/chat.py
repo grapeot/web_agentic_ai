@@ -31,6 +31,10 @@ router = APIRouter(prefix="/api")
 # Anthropic client - will be set from app.py
 client = None
 
+# Extract system message content for Claude API
+system_content = "You are running in a headless environment. When generating code that creates visualizations or outputs, DO NOT use interactive elements like plt.show(), figure.show(), or display(). If the code generates any file, print out the file path in the code."
+        
+
 def set_anthropic_client(anthropic_client):
     """Set the Anthropic client for this module"""
     global client
@@ -45,15 +49,15 @@ async def chat(request: UserRequest, background_tasks: BackgroundTasks, conversa
     try:
         logger.info("Received chat request")
         
-        # 首先检查URL参数中是否提供了conversation_id
+        # First check if conversation_id is provided in the URL parameters
         if not conversation_id:
-            # 如果URL参数中没有提供，尝试从请求体的系统消息中提取
+            # If not provided, try to extract it from the system message
             for message in request.messages:
                 if message.role == "system" and any(content.get("conversation_id") for content in message.content if isinstance(content, dict)):
                     conversation_id = next((content.get("conversation_id") for content in message.content if isinstance(content, dict) and "conversation_id" in content), None)
                     break
         
-        # 如果仍未找到，创建新的conversation_id
+        # If still not found, create a new conversation_id
         if not conversation_id:
             conversation_id = f"conv_{int(time.time())}"
             logger.info(f"Created new conversation ID: {conversation_id}")
@@ -69,9 +73,6 @@ async def chat(request: UserRequest, background_tasks: BackgroundTasks, conversa
         
         # Prepare messages for Claude API
         api_messages = []
-        
-        # Extract system message content for Claude API
-        system_content = "You are running in a headless environment. When generating code that creates visualizations or outputs, DO NOT use interactive elements like plt.show(), figure.show(), or display()."
         
         for msg in request.messages:
             # Format message content for the API
@@ -253,13 +254,7 @@ async def submit_tool_results(
         logger.info("Sending tool result to Claude API")
         response = client.messages.create(
             model="claude-3-7-sonnet-20250219",
-            system="You are running in a headless environment. When generating code that creates visualizations or outputs:\n"\
-                  "1. DO NOT use interactive elements like plt.show(), figure.show(), or display()\n"\
-                  "2. Instead, save outputs to files (e.g., plt.savefig('output.png'))\n"\
-                  "3. For Python plots, use matplotlib's savefig() method\n"\
-                  "4. For Jupyter-style outputs, write to files instead\n"\
-                  "5. Always provide complete, self-contained code that can run without user interaction\n"\
-                  "6. Assume your code runs in a script context, not an interactive notebook",
+            system=system_content,
             messages=history,
             max_tokens=4096,
             temperature=1.0,  # Must be 1.0 when thinking is enabled
