@@ -1,195 +1,464 @@
 # Frontend Documentation
 
-## Overview
+## Project Structure
 
-The frontend implements a chat interface with support for:
-- Text messages
-- Tool calls and results
-- File previews
-- Markdown/HTML rendering
-- Auto-execution of tools
-- Real-time updates via polling
+```
+frontend/
+├── css/                 # Style files
+│   └── styles.css      # Main style file
+├── js/                  # JavaScript source code
+│   ├── modules/         # Modular components
+│   │   ├── api.js      # API communication layer
+│   │   ├── config.js   # Configuration constants
+│   │   ├── events.js   # Event handling
+│   │   ├── filePreview.js # File preview
+│   │   ├── state.js    # State management
+│   │   ├── tools.js    # Tool call handling
+│   │   ├── ui.js       # UI rendering
+│   │   └── utils.js    # Utility functions
+│   └── main.js         # Application entry
+├── node_modules/        # Dependencies
+├── index.html          # Main page
+├── package.json        # Project configuration
+└── README.md           # Documentation
+```
 
-## Message Rendering Logic
+## Technology Stack
 
-### Message Types
-
-1. **Text Messages**
-   - User messages: Simple text with Markdown support
-   - Assistant messages: Text with Markdown support
-   - Thinking process: Special format showing Claude's thinking
-
-2. **Tool Calls**
-   - Collapsible sections with:
-     - Header showing tool name
-     - Input parameters in JSON format
-     - Result container for tool output
-   - Toggle functionality for expanding/collapsing
-
-3. **Tool Results**
-   - Can be standalone or attached to tool calls
-   - Special handling for different result types:
-     - File results (images, markdown, html)
-     - Command outputs
-     - JSON data
-     - Generated files
-
-### Rendering Flow
-
-1. **Message Addition**
-   ```javascript
-   addMessageToChat(role, content)
-   ```
-   - Creates message container with appropriate class
-   - Processes content through Markdown parser
-   - Applies syntax highlighting to code blocks
-   - Handles image loading and zoom functionality
-
-2. **Tool Call Addition**
-   ```javascript
-   addToolCallToChat(toolCall)
-   ```
-   - Creates collapsible tool call container
-   - Formats input parameters as JSON
-   - Prepares result container
-   - Sets up event listeners for toggling
-
-3. **Tool Result Addition**
-   ```javascript
-   addToolResultToChat(result, toolUseId)
-   ```
-   - Finds matching tool call container
-   - Processes result based on type:
-     - File results: Preview + download options
-     - Command output: Formatted display
-     - JSON data: Pretty printed
-   - Adds interactive elements (preview buttons, toggles)
-
-## File Handling
-
-### Supported File Types
-
-1. **Images**
-   - Direct inline display
-   - Click to zoom
-   - Download option
-
-2. **Markdown**
-   - Preview button
-   - Rendered view with syntax highlighting
-   - Close/expand options
-
-3. **HTML**
-   - Preview in sandbox iframe
-   - Open in new tab option
-   - Security restrictions applied
-
-### File Result Structure
-
-```javascript
+### 1. Core Dependencies
+```json
 {
-  status: "success",
-  file_path: string,
-  file_url: string,
-  render_type: "image" | "markdown" | "html",
-  view_url?: string
+  "type": "module",          // Using ES Modules
+  "devDependencies": {
+    "@babel/core": "^7.22.5",      // Babel core
+    "@babel/preset-env": "^7.22.5", // Babel preset
+    "jest": "^29.7.0",             // Testing framework
+    "jest-environment-jsdom": "^29.7.0"  // DOM testing environment
+  }
 }
 ```
 
-## Real-time Updates
+### 2. External Libraries
+- Bootstrap 5.3.2 (UI framework)
+- Font Awesome 6.4.0 (Icons)
+- Highlight.js 11.7.0 (Code highlighting)
+- Marked (Markdown parsing)
 
-### Polling Mechanism
+### 3. Style System
+```css
+:root {
+  --primary-color: #4f46e5;    // Main color
+  --bg-color: #f9fafb;         // Background color
+  --card-bg: #ffffff;          // Card background
+  --text-color: #1f2937;       // Text color
+  // ... other theme variables
+}
+```
 
-1. **Initialization**
-   - Starts when auto-execute is enabled
-   - 5-second interval checks
+## Page Structure
 
-2. **Update Process**
-   - Fetches new messages
-   - Tracks displayed content to prevent duplicates
-   - Updates UI progressively
+### 1. Layout Components
 
-3. **State Management**
-   - Maintains conversation history
-   - Tracks tool calls and results
-   - Manages auto-execution state
+**Tools Sidebar:**
+```html
+<div class="tools-container">
+  <div class="tools-header">
+    <h3><i class="fas fa-toolbox"></i>Available Tools</h3>
+  </div>
+  <ul id="tools-group" class="list-group tools-list"></ul>
+</div>
+```
 
-## UI Components
+**Chat Main Area:**
+```html
+<div class="chat-container">
+  <div class="chat-header">...</div>
+  <div id="chat-messages" class="chat-messages"></div>
+  <div class="input-area">...</div>
+</div>
+```
 
-### Message Display
-- Chat container with scrolling
-- Message bubbles with role-based styling
-- Code block formatting
-- Image handling
+**Settings Panel:**
+```html
+<div class="settings-panel">
+  <!-- Temperature control -->
+  <!-- Maximum token count -->
+  <!-- Thinking mode setting -->
+  <!-- Auto execution switch -->
+</div>
+```
 
-### Tool Interface
-- Collapsible sections
-- JSON formatting
-- Result previews
-- Interactive elements
+### 2. Interactive Components
 
-### Control Elements
-- Send button
-- Temperature/token controls
-- Auto-execute toggle
-- Clear chat function
+**Message Input:**
+```html
+<form id="chat-form">
+  <textarea id="user-input"></textarea>
+  <button type="submit" id="send-button">
+    <i class="fas fa-paper-plane"></i>
+  </button>
+</form>
+```
 
-## Best Practices
+**Tool Result Modal:**
+```html
+<div class="modal" id="toolResultModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <!-- Tool result input and submission -->
+    </div>
+  </div>
+</div>
+```
 
-1. **Error Handling**
-   - Graceful fallbacks for parsing errors
-   - Image load error handling
-   - Network request error management
+## Style Implementation
 
-2. **Performance**
-   - Lazy loading of previews
-   - Efficient DOM updates
-   - Debounced polling
+### 1. Responsive Design
+- Elastic layout system
+- Mobile device adaptation
+- Breakpoint management
+- Container adaptation
 
-3. **Security**
-   - HTML sanitization
-   - Sandboxed iframes
-   - URL validation
+### 2. Theme System
+- CSS variable definition
+- Color system
+- Space specification
+- Shadow effect
 
-4. **Accessibility**
-   - ARIA labels
-   - Keyboard navigation
-   - Screen reader support
+### 3. Animation Effect
+- Message fade-in
+- State transition
+- Loading animation
+- Interactive feedback
 
-## Event Handling
+### 4. Accessibility
+- ARIA tag support
+- Keyboard navigation
+- Focus management
+- Screen reader compatibility
 
-1. **User Interactions**
-   - Message sending
-   - Tool result submission
-   - Preview toggling
-   - File downloads
+## Core Function Implementation
 
-2. **System Events**
-   - Auto-execution updates
-   - Polling responses
-   - Error conditions
+### 1. State Management (state.js)
 
-## State Management
+Using singleton pattern state manager:
 
-1. **Conversation State**
-   - Message history
-   - Current tool call
-   - Auto-execution status
+**State Content:**
+- Conversation history (messages)
+- Tool call status (currentToolUseId, waitingForToolResult)
+- Auto execution status (autoExecutingTools, pollingInterval)
+- Settings (settings)
+- Message deduplication tracking (processedMessageIds, processedTextContent)
 
-2. **UI State**
-   - Loading indicators
-   - Preview states
-   - Collapse states
+**Key Methods:**
+```javascript
+state.reset()                    // Reset all states
+state.addMessage(message)        // Add message to history
+state.updateSetting(key, value)  // Update setting
+state.hasProcessedMessage(id)    // Check if message has been processed
+state.hasProcessedContent(text)  // Check if content has been processed
+```
 
-## Integration Points
+### 2. Tool Call Handling (tools.js)
 
-1. **API Endpoints**
-   - Chat messages
-   - Tool results
-   - File handling
-   - Status updates
+Tool call lifecycle management:
 
-2. **External Libraries**
-   - Marked (Markdown parsing)
-   - Highlight.js (code highlighting)
-   - Bootstrap (UI components) 
+**Core Functionality:**
+- Message content parsing and tool call recognition
+- Auto execution mode support
+- Polling update mechanism
+- Tool result processing and display
+
+**Key Flow:**
+```javascript
+processAssistantMessage(content)  // Process assistant message
+startPollingForUpdates()         // Start polling update
+updateChatWithNewMessages(msgs)   // Process new message update
+```
+
+### 3. UI Rendering (ui.js)
+
+Interface rendering and interaction processing:
+
+**DOM Element Cache:**
+```javascript
+const elements = {
+  chatMessages: null,
+  userInput: null,
+  sendButton: null,
+  // ... other UI elements
+}
+```
+
+**Core Functionality:**
+- Markdown rendering (using marked library)
+- Code highlighting (using highlight.js)
+- Message deduplication display
+- Loading status management
+- Tool result modal
+
+**Key Methods:**
+```javascript
+initializeUI()                   // Initialize UI elements
+addMessageToChat(role, content)  // Add message to chat
+setLoading(isLoading)           // Set loading status
+setAutoExecutionIndicator(visible) // Set auto execution indicator
+```
+
+### 4. Main Program (main.js)
+
+Application initialization and module integration:
+
+**Initialization Flow:**
+1. Initialize after DOM load is complete
+2. Initialize UI components
+3. Set event listeners
+4. Reset state
+5. Get and initialize available tools
+6. Display welcome message
+
+**Test Support:**
+- Provide test environment compatibility
+- Export module interface for test use
+
+### 5. API Communication Layer (api.js)
+
+API implementation for communication with backend:
+
+**Core Interface:**
+```javascript
+fetchAvailableTools()            // Get available tool list
+sendMessage(msgs, settings, id)  // Send chat message
+submitToolResult(id, result)     // Submit tool execution result
+getConversationUpdates(id)       // Get conversation update
+```
+
+**Error Handling Mechanism:**
+- HTTP status code verification
+- Request error capture and logging
+- Response data verification
+- Session ID management
+
+**Message Processing:**
+- Message array verification and filtering
+- Empty content filtering
+- Debug log recording
+- Error information formatting
+
+### 6. Event Handling (events.js)
+
+User interaction and event management:
+
+**Event Listeners:**
+```javascript
+initializeEventListeners()      // Initialize all event listeners
+handleChatSubmit(event)        // Process chat submission
+handleSettingsSubmit(event)    // Process setting submission
+handleToolExecution(event)     // Process tool execution
+```
+
+**Interactive Functionality:**
+- Form submission processing
+- Keyboard shortcut (Enter send)
+- Settings panel switching
+- Tool call folding/expanding
+
+**State Synchronization:**
+- Form disable status
+- Loading indicator
+- Setting verification
+- Error prompt
+
+### 7. Configuration Management (config.js)
+
+System configuration and constant definition:
+
+**API Configuration:**
+```javascript
+const API_URL = (() => {
+  // Dynamic API endpoint detection
+  if (window.API_BASE_URL) return window.API_BASE_URL;
+  if (window.location.pathname.startsWith('/frontend/')) {
+    return window.location.origin;
+  }
+  return '';
+})();
+```
+
+**System Constants:**
+```javascript
+const POLLING_INTERVAL = 5000;  // Polling interval (milliseconds)
+const DEFAULT_SETTINGS = {      // Default settings
+  temperature: 0.5,
+  maxTokens: 4000,
+  thinkingMode: true,
+  thinkingBudget: 2000,
+  autoExecuteTools: true
+};
+```
+
+**UI Constants:**
+- Message type definition
+- Role type definition
+- File preview configuration
+- CSS class name mapping
+
+### 8. File Preview (filePreview.js)
+
+File preview functionality implementation:
+
+**Preview Type:**
+```javascript
+// Supported file types
+const SUPPORTED_TYPES = {
+  IMAGE: ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'],
+  MARKDOWN: ['md', 'markdown'],
+  HTML: ['html', 'htm'],
+  CODE: ['js', 'ts', 'jsx', 'tsx', 'py', 'java', 'cpp', 'cs', 'go', 'rs'],
+  STYLE: ['css', 'scss', 'less']
+};
+```
+
+**Core Functionality:**
+- Markdown file preview and rendering
+- HTML file safe preview
+- Image file preview and zoom
+- Code file syntax highlighting
+
+**Security Mechanism:**
+- HTML sandbox isolation
+- Link security attributes
+- Download link verification
+- Error boundary handling
+
+### 9. Utility Functions (utils.js)
+
+General purpose function set:
+
+**String Processing:**
+```javascript
+escapeHtml(text)              // HTML special character escaping
+cleanLineBreaks(text)         // Clean up extra line breaks
+getFileName(path)             // Get file name
+getFileExtension(filename)    // Get file extension
+```
+
+**JSON Processing:**
+```javascript
+safeJsonParse(str, default)   // Safe JSON parsing
+safeJsonStringify(val, indent) // Safe JSON stringification
+deepClone(obj)                // Deep clone object
+```
+
+**Performance Optimization:**
+```javascript
+debounce(func, wait)          // Function debounce
+throttle(func, limit)         // Function throttle
+```
+
+**File Processing:**
+```javascript
+getFileType(filename)         // Get file type
+getFileIcon(filename)         // Get file icon
+```
+
+## Behavior Guarantee
+
+### 1. Message Processing
+- Message deduplication (ID and content double check)
+- Markdown rendering error handling
+- Code highlighting downgrade support
+- Message type verification
+
+### 2. Tool Call
+- Tool call status synchronization
+- Auto execution status management
+- Polling update error handling
+- Result display verification
+
+### 3. UI Rendering
+- DOM element cache optimization
+- Loading status management
+- Dynamic content rendering
+- Error boundary handling
+
+### 4. State Management
+- State update atomicity
+- State access control
+- Setting verification
+- History record maintenance
+
+### 5. API Communication
+- Request error retry
+- Response data verification
+- Session status maintenance
+- Debug log recording
+
+### 6. Event Handling
+- Form status synchronization
+- User input verification
+- Keyboard event handling
+- Error feedback mechanism
+
+### 7. Configuration Management
+- Environment adaptation
+- Type definition
+- Constant maintenance
+- Style mapping
+
+### 8. File Preview
+- Preview security isolation
+- Rendering performance optimization
+- File type validation
+- Error handling mechanism
+
+### 9. Utility Functions
+- Function purity guarantee
+- Error boundary handling
+- Performance optimization support
+- Type safety guarantee
+
+## Development Guide
+
+### 1. Adding New Tools
+1. Add tool configuration in config.js
+2. Implement tool handling logic in tools.js
+3. Add corresponding UI components in ui.js
+4. Update state management related code
+
+### 2. Modifying Message Processing
+1. Handle new message types in processAssistantMessage in tools.js
+2. Add new rendering logic in ui.js
+3. Update state tracking mechanism
+
+### 3. Customizing UI Components
+1. Add new elements in the elements object
+2. Initialize in initializeUI
+3. Implement corresponding handling methods
+4. Add necessary state management code
+
+## Testing Points
+
+### 1. State Management Testing
+- State update correctness
+- Message deduplication mechanism
+- Settings validation
+- State reset functionality
+
+### 2. Tool Call Testing
+- Tool call parsing
+- Auto execution logic
+- Polling update mechanism
+- Result handling process
+
+### 3. UI Rendering Testing
+- Message rendering correctness
+- Loading state switching
+- Error handling mechanism
+- Dynamic content updates
+
+### 4. Integration Testing
+- Module interactions
+- State synchronization
+- Error propagation
+- Performance behavior 
