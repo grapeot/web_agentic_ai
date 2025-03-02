@@ -1,5 +1,0 @@
-[Cursor] 完成从 app/tools 到 app/api/tools 的迁移
-
-1. 移除了旧的 app/tools 目录
-2. 更新了所有导入路径从 app.tools 到 app.api.tools
-3. 修复了测试脚本，避免 pytest 将脚本函数识别为测试
