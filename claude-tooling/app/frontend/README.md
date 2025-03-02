@@ -42,7 +42,6 @@ frontend/
 - Bootstrap 5.3.2 (UI framework)
 - Font Awesome 6.4.0 (Icons)
 - Highlight.js 11.7.0 (Code highlighting)
-- Marked (Markdown parsing)
 
 ### 3. Style System
 ```css
@@ -191,8 +190,8 @@ const elements = {
 ```
 
 **Core Functionality:**
-- Markdown rendering (using marked library)
-- Code highlighting (using highlight.js)
+- Plain text rendering with HTML escaping
+- Line break preservation
 - Message deduplication display
 - Loading status management
 - Tool result modal
@@ -320,15 +319,15 @@ const SUPPORTED_TYPES = {
 ```
 
 **Core Functionality:**
-- Markdown file preview and rendering
+- Plain text file preview with line breaks
 - HTML file safe preview
 - Image file preview and zoom
-- Code file syntax highlighting
+- Code file highlighting (limited)
 
 **Security Mechanism:**
 - HTML sandbox isolation
 - Link security attributes
-- Download link verification
+- HTML content escaping
 - Error boundary handling
 
 ### 9. Utility Functions (utils.js)
@@ -366,8 +365,8 @@ getFileIcon(filename)         // Get file icon
 
 ### 1. Message Processing
 - Message deduplication (ID and content double check)
-- Markdown rendering error handling
-- Code highlighting downgrade support
+- Text content escaping for security
+- Line break preservation
 - Message type verification
 
 ### 2. Tool Call
