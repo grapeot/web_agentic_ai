@@ -16,7 +16,6 @@ from ..services.conversation import (
     get_conversation, get_root_dir, get_task_status, set_task_status
 )
 from ..services.tool_execution import process_tool_calls_and_continue, auto_execute_tool_calls
-from ..services.markdown_service import MarkdownService
 from ..tools.tool_wrapper import TOOL_DEFINITIONS, format_tool_results_for_claude
 
 # Configure logging
@@ -72,7 +71,12 @@ async def chat(request: UserRequest, background_tasks: BackgroundTasks, conversa
         api_messages = []
         
         # Extract system message content for Claude API
-        system_content = "You are running in a headless environment. When generating code that creates visualizations or outputs, DO NOT use interactive elements like plt.show(), figure.show(), or display()."
+        system_content = """You are running in a headless environment. When generating code that creates visualizations or outputs, DO NOT use interactive elements like plt.show(), figure.show(), or display().
+
+Format your responses directly in HTML instead of Markdown. Use appropriate HTML tags like <h1>, <h2>, <p>, <ul>, <li>, <code>, <pre>, etc. to format your content.
+For code blocks, use <pre><code class="language-xxx">...</code></pre> with the appropriate language class.
+Ensure your HTML is valid and does not contain unsafe elements or attributes.
+"""
         
         for msg in request.messages:
             # Format message content for the API
@@ -205,15 +209,8 @@ async def chat(request: UserRequest, background_tasks: BackgroundTasks, conversa
             tool_calls_for_response = tool_calls
         
         # Prepare the response
-        # Process Markdown content before returning
-        if content:
-            processed_content = MarkdownService.process_message_content(content)
-            logger.debug(f"Processed message content with Markdown conversion")
-        else:
-            processed_content = content
-
         return UserResponse(
-            message=Message(role="assistant", content=processed_content),
+            message=Message(role="assistant", content=content),
             conversation_id=conversation_id,
             tool_calls=tool_calls_for_response,
             thinking=thinking
@@ -261,13 +258,18 @@ async def submit_tool_results(
         logger.info("Sending tool result to Claude API")
         response = client.messages.create(
             model="claude-3-7-sonnet-20250219",
-            system="You are running in a headless environment. When generating code that creates visualizations or outputs:\n"\
-                  "1. DO NOT use interactive elements like plt.show(), figure.show(), or display()\n"\
-                  "2. Instead, save outputs to files (e.g., plt.savefig('output.png'))\n"\
-                  "3. For Python plots, use matplotlib's savefig() method\n"\
-                  "4. For Jupyter-style outputs, write to files instead\n"\
-                  "5. Always provide complete, self-contained code that can run without user interaction\n"\
-                  "6. Assume your code runs in a script context, not an interactive notebook",
+            system="""You are running in a headless environment. When generating code that creates visualizations or outputs:
+1. DO NOT use interactive elements like plt.show(), figure.show(), or display()
+2. Instead, save outputs to files (e.g., plt.savefig('output.png'))
+3. For Python plots, use matplotlib's savefig() method
+4. For Jupyter-style outputs, write to files instead
+5. Always provide complete, self-contained code that can run without user interaction
+6. Assume your code runs in a script context, not an interactive notebook
+
+Format your responses directly in HTML instead of Markdown. Use appropriate HTML tags like <h1>, <h2>, <p>, <ul>, <li>, <code>, <pre>, etc. to format your content.
+For code blocks, use <pre><code class="language-xxx">...</code></pre> with the appropriate language class.
+Ensure your HTML is valid and does not contain unsafe elements or attributes.
+""",
             messages=history,
             max_tokens=4096,
             temperature=1.0,  # Must be 1.0 when thinking is enabled
@@ -347,19 +349,12 @@ async def submit_tool_results(
                 client
             )
         
-        # Prepare the result to return to the frontend
-        result = {
-            "message": Message(role="assistant", content=content),
-            "conversation_id": conversation_id,
-            "tool_calls": [] if auto_execute_tools else tool_calls,
-        }
-        
-        # Process Markdown content in message before returning
-        if "message" in result and result["message"] and "content" in result["message"]:
-            processed_content = MarkdownService.process_message_content(result["message"].content)
-            result["message"].content = processed_content
-            
-        return UserResponse(**result)
+        # Prepare the response
+        return UserResponse(
+            message=Message(role="assistant", content=content),
+            conversation_id=conversation_id,
+            tool_calls=tool_calls
+        )
         
     except Exception as e:
         logger.error(f"Error processing tool results: {str(e)}")
