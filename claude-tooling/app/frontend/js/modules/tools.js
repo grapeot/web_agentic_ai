@@ -167,6 +167,11 @@ function updateChatWithNewMessages(newMessages) {
       // Process message content
       for (const item of message.content) {
         if (item.type === config.MESSAGE_TYPES.TEXT) {
+          // Skip if we've already processed this text content
+          if (item.text && state.hasProcessedContent(item.text)) {
+            continue;
+          }
+          
           // Text message - ensure proper spacing between chunks
           if (textContent && item.text) {
             // Only add a space if needed to prevent words from running together

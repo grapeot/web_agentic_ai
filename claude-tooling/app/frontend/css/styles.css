@@ -903,4 +903,64 @@ pre code {
 
 .assistant-message code {
     color: #d4d4d4;
+}
+
+/* Thinking section styles */
+.thinking-section {
+    margin: 10px 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background-color: var(--thinking-bg);
+}
+
+.thinking-toggle {
+    width: 100%;
+    padding: 8px;
+    text-align: left;
+    background-color: #f1f3f5;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    font-size: 0.9em;
+}
+
+.thinking-toggle:hover {
+    background-color: #e9ecef;
+}
+
+.thinking-content {
+    padding: 10px;
+    overflow: auto;
+}
+
+.thinking-section.collapsed .thinking-content {
+    display: none;
+}
+
+/* Add icon for toggle button */
+.thinking-toggle::before {
+    content: '▼';
+    margin-right: 8px;
+    font-size: 0.8em;
+    transition: transform 0.2s;
+}
+
+.thinking-section.collapsed .thinking-toggle::before {
+    transform: rotate(-90deg);
+}
+
+/* Ensure code blocks in thinking content look good */
+.thinking-content pre {
+    margin: 10px 0;
+    padding: 10px;
+    background-color: var(--thinking-bg);
+    border-radius: var(--radius-md);
+    overflow-x: auto;
+}
+
+.thinking-content code {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.9em;
 } 
