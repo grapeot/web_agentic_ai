@@ -28,7 +28,17 @@ function processAssistantMessage(content) {
     
     if (item.type === 'text' && item.text) {
       // Ensure text is a string
-      finalTextContent = typeof item.text === 'string' ? item.text : JSON.stringify(item.text);
+      const textContent = typeof item.text === 'string' ? item.text : JSON.stringify(item.text);
+      
+      // Ensure proper spacing between text chunks
+      if (finalTextContent && textContent) {
+        if (!finalTextContent.endsWith(' ') && !finalTextContent.endsWith('\n') && 
+            !textContent.startsWith(' ') && !textContent.startsWith('\n')) {
+          finalTextContent += ' '; // Add space between concatenated text chunks
+        }
+      }
+      
+      finalTextContent += textContent;
     } else if (item.type === 'tool_use') {
       toolCall = {
         id: item.id,
@@ -38,13 +48,18 @@ function processAssistantMessage(content) {
     }
   });
   
+  // Clean up unnecessary consecutive line breaks
+  if (finalTextContent) {
+    finalTextContent = utils.cleanLineBreaks(finalTextContent);
+  }
+  
   // Log final text content for debugging
   console.log('Final text content:', finalTextContent);
   
   // Add text message if we have one and haven't processed it yet
-  if (finalTextContent && !state.hasProcessedContent(finalTextContent)) {
+  if (finalTextContent && !state.hasProcessedContent(finalTextContent.trim())) {
     ui.addMessageToChat(config.ROLES.ASSISTANT, finalTextContent);
-    state.addProcessedContent(finalTextContent);
+    // Note: ui.addMessageToChat now handles adding to processedContent set
   }
   
   // Display tool call if we have one
@@ -219,10 +234,10 @@ function updateChatWithNewMessages(newMessages) {
         textContent = utils.cleanLineBreaks(textContent);
         
         // Display text and tool calls if not already processed
-        if (foundLastHandled && !state.hasProcessedContent(textContent)) {
+        if (foundLastHandled && !state.hasProcessedContent(textContent.trim())) {
           // Add the message to the chat
           ui.addMessageToChat(config.ROLES.ASSISTANT, textContent);
-          state.addProcessedContent(textContent);
+          // Note: ui.addMessageToChat now handles adding to processedContent set
         }
       }
       

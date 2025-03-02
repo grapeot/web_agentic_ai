@@ -70,16 +70,13 @@ if (!isTestEnvironment) {
       
       // Debug logs for welcome message
       console.log('Adding welcome message with role:', config.ROLES.ASSISTANT);
-      const welcomeMessage = {
-        type: config.MESSAGE_TYPES.TEXT,
-        text: 'Hello! I am Claude, your AI assistant. How can I help you today?'
-      };
+      const welcomeMessage = 'Hello! I am Claude, your AI assistant. How can I help you today?';
       console.log('Welcome message content:', welcomeMessage);
       
       // Add welcome message
       ui.addMessageToChat(
         config.ROLES.ASSISTANT,
-        welcomeMessage // Changed from string to message object
+        welcomeMessage
       );
       
       console.log('Claude Tooling initialization complete');
