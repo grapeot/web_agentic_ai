@@ -158,10 +158,14 @@ function updateChatWithNewMessages(newMessages) {
   let foundLastHandled = !lastHandledToolId; // If no last ID, consider it found
   let hasNewToolCalls = false;
   
+  // Get the current messages from state
+  const currentMessages = state.getMessages();
+  const currentMessageIds = new Set(currentMessages.map(msg => msg.id));
+  
   // Process messages
   for (const message of newMessages) {
     // Skip already processed messages to avoid duplication
-    if (message.id && processedMessageIds.has(message.id)) {
+    if (message.id && (processedMessageIds.has(message.id) || currentMessageIds.has(message.id))) {
       continue;
     }
     
@@ -213,14 +217,21 @@ function updateChatWithNewMessages(newMessages) {
         ui.addToolCallToChat(toolCall);
       }
       
-      // Add message to state
-      state.addMessage(message);
+      // Add message to state if not already present
+      if (!currentMessageIds.has(message.id)) {
+        state.addMessage(message);
+      }
     } else if (message.role === ROLES.USER && message.content) {
       // User message processing - find tool results
       for (const item of message.content) {
         if (item.type === MESSAGE_TYPES.TOOL_RESULT && item.tool_use_id) {
           pendingToolResults.set(item.tool_use_id, item.content);
         }
+      }
+      
+      // Add message to state if not already present
+      if (!currentMessageIds.has(message.id)) {
+        state.addMessage(message);
       }
     }
   }

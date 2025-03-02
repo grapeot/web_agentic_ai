@@ -742,4 +742,35 @@ pre code {
     font-size: 0.875rem;
     color: var(--text-light);
     line-height: 1.4;
+}
+
+/* Chat message images */
+.message img {
+  max-width: 100%;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid #e0e0e0;
+  margin: 8px 0;
+}
+
+.message img.expanded {
+  max-width: 90%;
+  max-height: 80vh;
+  display: block;
+  margin: 15px auto;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  border: 2px solid #007bff;
+}
+
+.message img.image-load-error {
+  min-height: 50px;
+  min-width: 100px;
+  background-color: #f8d7da;
+  border: 1px dashed #dc3545;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #721c24;
+  font-style: italic;
 } 

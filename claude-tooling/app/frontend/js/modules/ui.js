@@ -162,11 +162,40 @@ function addMessageToChat(role, content) {
   
   // 根据消息类型处理内容
   if (typeof content === 'string') {
-    // 纯文本消息
-    messageDiv.textContent = content;
+    // 转换Markdown为HTML
+    messageDiv.innerHTML = marked.parse(content);
+    
+    // 处理代码块语法高亮
+    messageDiv.querySelectorAll('pre code').forEach((block) => {
+      hljs.highlightElement(block);
+    });
+    
+    // 确保图片链接正确显示
+    messageDiv.querySelectorAll('img').forEach(img => {
+      // 添加加载事件和错误处理
+      img.onerror = () => {
+        console.error(`Failed to load image: ${img.src}`);
+        img.alt = 'Image failed to load';
+        img.classList.add('image-load-error');
+      };
+      
+      // 为图片添加点击事件，实现点击放大效果
+      img.onclick = () => {
+        if (img.classList.contains('expanded')) {
+          img.classList.remove('expanded');
+        } else {
+          img.classList.add('expanded');
+        }
+      };
+    });
   } else if (content.type === MESSAGE_TYPES.TEXT) {
-    // 结构化文本消息
-    messageDiv.textContent = content.text;
+    // 结构化文本消息，同样处理为Markdown
+    messageDiv.innerHTML = marked.parse(content.text);
+    
+    // 处理代码块语法高亮
+    messageDiv.querySelectorAll('pre code').forEach((block) => {
+      hljs.highlightElement(block);
+    });
   }
   
   elements.chatMessages.appendChild(messageDiv);

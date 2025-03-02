@@ -30,6 +30,11 @@ The goal is to help you maintain a big picture as well as the progress of the ta
   - Tool results should be included as content blocks in a user message, not as a separate `tool_outputs` parameter
   - Assistant messages containing `tool_use` blocks must be followed by user messages with matching `tool_result` blocks
   - Preserve the complete response structure in conversation history, not just the extracted text
+- In JavaScript class implementations, avoid using method names as property names to prevent naming conflicts. For example, don't use `this.isAutoExecutingTools = false` when you have a method called `isAutoExecutingTools()`. Use a different property name like `this.autoExecutingTools` instead.
+- When rendering chat messages:
+  - Use `innerHTML` instead of `textContent` when you want to render Markdown or HTML content 
+  - Track processed message IDs to avoid duplicating messages during polling operations
+  - Include proper handling of image elements in Markdown (error handling, responsive design)
 
 # Scratchpad
 
@@ -51,33 +56,52 @@ Task: Refactor the large main.js file into modular components to improve maintai
    [X] 创建测试运行脚本
    [X] 添加项目README
 
-[ ] 1. 创建模块结构
+[X] 1. 创建模块结构
    [X] 创建目录结构
-   [ ] 创建空模块文件
+   [X] 创建模块文件
 
-[ ] 2. 拆分代码到模块
-   [ ] 创建config.js：配置设置
-   [ ] 创建api.js：API交互
-   [ ] 创建state.js：状态管理
-   [ ] 创建ui.js：UI渲染
-   [ ] 创建events.js：事件处理
-   [ ] 创建tools.js：工具功能
-   [ ] 创建filePreview.js：文件预览
-   [ ] 创建utils.js：辅助函数
+[X] 2. 拆分代码到模块
+   [X] 创建config.js：配置设置
+   [X] 创建api.js：API交互
+   [X] 创建state.js：状态管理
+   [X] 创建ui.js：UI渲染
+   [X] 创建events.js：事件处理
+   [X] 创建tools.js：工具功能
+   [X] 创建filePreview.js：文件预览
+   [X] 创建utils.js：辅助函数
 
-[ ] 3. 更新main.js
-   [ ] 替换为模块导入
-   [ ] 保持入口点功能
+[X] 3. 建立main.js框架
+   [X] 创建基本入口点结构
+   [X] 导入所有模块
+   [X] 添加初始化函数
+   
+[X] 4. 修复关键bug
+   [X] 修复state模块的命名冲突
+   [X] 确保ui模块正确导入state
+   [X] 修复工具折叠功能
+   [X] 修复消息重复问题
+   [X] 修复Markdown图片渲染问题
 
-[ ] 4. 测试功能确认
-   [ ] 运行测试验证所有功能
-   [ ] 手动检查交互功能
+[ ] 5. 运行测试验证功能
+   [ ] 确保初始化测试通过
+   [ ] 确保消息发送测试通过
+   [ ] 确保工具调用测试通过
+   [ ] 确保清除聊天测试通过
+   [ ] 确保设置调整测试通过
 
-[ ] 5. 添加文档
+[ ] 6. 重构main.js
+   [ ] 移除临时实现
+   [ ] 完全使用模块化方法
+   [ ] 保持功能一致性
+
+[ ] 7. 添加文档
    [ ] 为函数添加JSDoc注释
    [ ] 补充模块架构说明
 
-### 测试策略
-- 使用Jest和JSDOM测试DOM交互和功能流程
-- 每完成一个模块就进行增量式测试
-- 最终进行全面功能验证
+### 当前状态
+- 已修复state.js中isAutoExecutingTools()方法的命名冲突
+- 已修复ui.js中对state的正确导入
+- 已修复工具和结果的默认折叠显示
+- 已修复消息轮询时的重复问题
+- 已修复Markdown中图片链接不显示的问题
+- 下一步: 测试应用功能并修复任何剩余问题

@@ -2,6 +2,8 @@
 
 A Cursor-like AI development environment with advanced agentic capabilities, on a Web interface.
 
+![Robot Icon](claude-tooling/app/frontend/favicon.svg) 
+
 WARNING: the project is mainly for demo purpose only, not for production use. It has severe security issues that essentially allows any user to access your system.
 
 ![Example screenshot](screenshot.png)
