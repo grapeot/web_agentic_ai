@@ -3,6 +3,8 @@
  */
 import * as config from './config.js';
 import { state } from './state.js';
+import * as utils from './utils.js';
+import * as filePreview from './filePreview.js';
 const ROLES = config.ROLES;
 const TOOL_DISPLAY = config.TOOL_DISPLAY;
 const MESSAGE_TYPES = config.MESSAGE_TYPES;
@@ -150,29 +152,10 @@ function clearChat() {
 }
 
 /**
- * Sanitize HTML to prevent XSS attacks
- * Removes script tags and other potentially unsafe elements
- * @param {string} html - The HTML content to sanitize
- * @returns {string} - Sanitized HTML
- */
-function sanitizeHtml(html) {
-  // Remove script tags and their content
-  let sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-  
-  // Remove onclick, onerror, and other event handlers
-  sanitized = sanitized.replace(/ on\w+="[^"]*"/gi, '');
-  
-  // Remove javascript: URLs
-  sanitized = sanitized.replace(/javascript:[^\s"']+/gi, '');
-  
-  return sanitized;
-}
-
-/**
  * Add message to chat
- * @param {string} role - Role of the message sender (user or assistant)
- * @param {string|object} content - Message content
- * @param {string} type - Message type
+ * @param {string} role - Message role (user/assistant)
+ * @param {string|Object|Array} content - Message content
+ * @param {string} type - Message type (text/thinking)
  */
 function addMessageToChat(role, content, type) {
   console.log('Adding message type:', typeof content, role, content, type);
@@ -229,36 +212,25 @@ function addMessageToChat(role, content, type) {
   // Mark this content as processed to prevent duplicates
   state.addProcessedContent(textContent.trim());
   
-  // Function to render content
-  const renderContent = () => {
+  // Function to render markdown content
+  const renderMarkdown = () => {
     try {
-      // For user messages, escape HTML for security
-      if (role === config.ROLES.USER) {
-        // Simple plain text rendering - escape HTML for security
-        const safeText = escapeHtml(textContent).replace(/\n/g, '<br>');
-        messageDiv.innerHTML = safeText;
-      } else {
-        // For assistant messages, allow HTML but sanitize it for security
-        const sanitizedHtml = sanitizeHtml(textContent);
-        messageDiv.innerHTML = sanitizedHtml;
-        
-        // Apply syntax highlighting to code blocks if any
-        const codeBlocks = messageDiv.querySelectorAll('pre code');
-        if (codeBlocks.length > 0 && window.hljs) {
-          codeBlocks.forEach(block => {
-            window.hljs.highlightElement(block);
-          });
-        }
-      }
+      // Simple plain text rendering - no markdown, escape HTML for security
+      const safeText = escapeHtml(textContent).replace(/\n/g, '<br>');
+      messageDiv.innerHTML = safeText;
+      
+      // We can't apply syntax highlighting anymore since we're escaping everything
     } catch (error) {
-      console.error('Error rendering content:', error);
+      console.error('Error parsing text:', error);
       // Fallback to plain text with line breaks
       messageDiv.innerHTML = escapeHtml(textContent).replace(/\n/g, '<br>');
     }
   };
 
   // Render content immediately
-  renderContent();
+  renderMarkdown();
+  
+  // No need for delayed rendering since we're not using marked
   
   // Only append if we have content
   if (messageDiv.textContent || messageDiv.innerHTML) {
@@ -511,89 +483,170 @@ function generateFileListItem(file) {
 
 /**
  * Add tool result to chat
- * @param {Object|string} result - Result object or string
+ * @param {Object|string} result - Tool result
  * @param {string} toolUseId - Tool use ID
  */
 function addToolResultToChat(result, toolUseId) {
-  if (!elements.chatMessages) return;
+  console.log(`Adding tool result for ${toolUseId}:`, result);
   
-  console.log('Adding tool result:', typeof result, result, 'for tool ID:', toolUseId);
-  
-  const toolCallDiv = document.querySelector(`.tool-call[data-tool-use-id="${toolUseId}"]`);
-  if (!toolCallDiv || toolCallDiv.querySelector('.tool-result')) {
-    console.warn(`Tool call not found or result already displayed for ${toolUseId}`);
+  // Find the tool call div
+  const toolCallDiv = document.querySelector(`[data-tool-use-id="${toolUseId}"]`);
+  if (!toolCallDiv) {
+    console.error(`Tool call div not found for ID: ${toolUseId}`);
     return;
   }
   
-  const resultDiv = document.createElement('div');
-  resultDiv.className = 'tool-result';
-  
-  // Create header
-  const headerDiv = document.createElement('div');
-  headerDiv.className = 'result-header';
-  headerDiv.innerHTML = `
-    <span class="result-toggle">${TOOL_DISPLAY.EXPAND_ARROW}</span>
-    <strong>Tool Result</strong>
-  `;
-  resultDiv.appendChild(headerDiv);
-  
-  // Create content container
-  const contentDiv = document.createElement('div');
-  contentDiv.className = 'result-content';
-  contentDiv.style.display = 'none';
-  resultDiv.appendChild(contentDiv);
-  
-  try {
-    // Parse result if needed
-    const parsedResult = typeof result === 'string' ? JSON.parse(result) : result;
-    
-    if (typeof parsedResult === 'object' && parsedResult !== null) {
-      if (parsedResult.status === 'success' && parsedResult.message) {
-        // Handle successful operation result
-        const statusContent = document.createElement('div');
-        statusContent.className = 'tool-result-status';
-        statusContent.innerHTML = generateStatusContent(parsedResult);
-        contentDiv.appendChild(statusContent);
-        
-        // For save_file tool, also show the file content
-        if (parsedResult.message.includes('File saved')) {
-          appendFileContent(contentDiv, toolCallDiv, parsedResult);
-        }
-      } else if (parsedResult.files) {
-        // Handle file results
-        contentDiv.innerHTML = processFileResults(parsedResult, Array.isArray(parsedResult.files));
-      } else {
-        // Handle other object results
-        const pre = document.createElement('pre');
-        pre.className = 'result-json';
-        pre.textContent = JSON.stringify(parsedResult, null, 2);
-        contentDiv.appendChild(pre);
-      }
-    } else {
-      // Handle primitive values
-      const textDiv = document.createElement('div');
-      textDiv.className = 'result-text';
-      textDiv.textContent = String(parsedResult);
-      contentDiv.appendChild(textDiv);
+  // Parse the result if it's a string
+  let resultObj = result;
+  if (typeof result === 'string') {
+    try {
+      resultObj = JSON.parse(result);
+    } catch (e) {
+      console.warn('Error parsing tool result:', e);
+      resultObj = { 
+        status: 'error', 
+        error: `Failed to parse result: ${e.message}`, 
+        rawResult: result 
+      };
     }
-  } catch (e) {
-    console.error('Error processing tool result:', e);
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error-message';
-    errorDiv.textContent = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-    contentDiv.appendChild(errorDiv);
   }
   
-  // Add toggle functionality
-  headerDiv.addEventListener('click', () => {
-    const isCollapsed = contentDiv.style.display === 'none';
-    contentDiv.style.display = isCollapsed ? 'block' : 'none';
-    headerDiv.querySelector('.result-toggle').innerHTML = 
-      isCollapsed ? TOOL_DISPLAY.COLLAPSE_ARROW : TOOL_DISPLAY.EXPAND_ARROW;
-  });
+  // Remove waiting status from tool call div
+  toolCallDiv.classList.remove('waiting');
   
-  toolCallDiv.appendChild(resultDiv);
-  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+  // Get or create result container
+  let resultContainer = toolCallDiv.querySelector('.tool-result-container');
+  if (!resultContainer) {
+    resultContainer = document.createElement('div');
+    resultContainer.className = 'tool-result-container';
+    toolCallDiv.appendChild(resultContainer);
+  } else {
+    // Clear existing result content
+    resultContainer.innerHTML = '';
+  }
+  
+  // Add result content
+  const resultContent = document.createElement('div');
+  resultContent.className = 'tool-result-content';
+  
+  // Process standard properties
+  if (resultObj.status) {
+    resultContent.innerHTML += generateStatusContent(resultObj);
+  }
+  
+  // Standard result text display
+  if (resultObj.stdout || resultObj.stderr || resultObj.output || resultObj.result || resultObj.response) {
+    const output = resultObj.stdout || resultObj.output || resultObj.result || resultObj.response || '';
+    const error = resultObj.stderr || resultObj.error || '';
+    
+    // Display stdout first if present
+    if (output && output.trim() !== '') {
+      const outputDiv = document.createElement('div');
+      outputDiv.className = 'tool-output';
+      
+      const outputContent = document.createElement('pre');
+      outputContent.className = 'output-content';
+      outputContent.textContent = output;
+      
+      const outputLabel = document.createElement('div');
+      outputLabel.className = 'tool-section-label';
+      outputLabel.innerHTML = '<i class="fas fa-terminal"></i> Output';
+      
+      // Apply initial collapsed state if configured
+      if (config.TOOL_DISPLAY.INITIAL_COLLAPSED) {
+        outputContent.style.display = 'none';
+        outputLabel.className += ' collapsed';
+        outputLabel.innerHTML += ` <span class="toggle-arrow">${config.TOOL_DISPLAY.EXPAND_ARROW}</span>`;
+        
+        // Add click event to toggle visibility
+        outputLabel.addEventListener('click', function() {
+          const isCollapsed = outputContent.style.display === 'none';
+          outputContent.style.display = isCollapsed ? 'block' : 'none';
+          this.classList.toggle('collapsed');
+          const arrow = this.querySelector('.toggle-arrow');
+          if (arrow) {
+            arrow.innerHTML = isCollapsed ? config.TOOL_DISPLAY.COLLAPSE_ARROW : config.TOOL_DISPLAY.EXPAND_ARROW;
+          }
+        });
+      }
+      
+      outputDiv.appendChild(outputLabel);
+      outputDiv.appendChild(outputContent);
+      resultContent.appendChild(outputDiv);
+    }
+    
+    // Display stderr if present
+    if (error && error.trim() !== '') {
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'tool-error';
+      
+      const errorContent = document.createElement('pre');
+      errorContent.className = 'error-content';
+      errorContent.textContent = error;
+      
+      const errorLabel = document.createElement('div');
+      errorLabel.className = 'tool-section-label';
+      errorLabel.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error/Warnings';
+      
+      // Apply initial collapsed state if configured
+      if (config.TOOL_DISPLAY.INITIAL_COLLAPSED) {
+        errorContent.style.display = 'none';
+        errorLabel.className += ' collapsed';
+        errorLabel.innerHTML += ` <span class="toggle-arrow">${config.TOOL_DISPLAY.EXPAND_ARROW}</span>`;
+        
+        // Add click event to toggle visibility
+        errorLabel.addEventListener('click', function() {
+          const isCollapsed = errorContent.style.display === 'none';
+          errorContent.style.display = isCollapsed ? 'block' : 'none';
+          this.classList.toggle('collapsed');
+          const arrow = this.querySelector('.toggle-arrow');
+          if (arrow) {
+            arrow.innerHTML = isCollapsed ? config.TOOL_DISPLAY.COLLAPSE_ARROW : config.TOOL_DISPLAY.EXPAND_ARROW;
+          }
+        });
+      }
+      
+      errorDiv.appendChild(errorLabel);
+      errorDiv.appendChild(errorContent);
+      resultContent.appendChild(errorDiv);
+    }
+  }
+  
+  // Check for and display generated files
+  if (resultObj._hasGeneratedFiles && resultObj.generated_files) {
+    const filesContainer = document.createElement('div');
+    filesContainer.className = 'generated-files-container';
+    
+    // Use filePreview module to handle the files
+    const filePreviewElement = filePreview.displayToolGeneratedFiles(resultObj, filesContainer);
+    if (filePreviewElement) {
+      resultContent.appendChild(filesContainer);
+    }
+  }
+  
+  // For file handling tools, display file content
+  if (resultObj.files || resultObj.file_path || resultObj.file_url) {
+    appendFileContent(resultContent, toolCallDiv, resultObj);
+  }
+  
+  resultContainer.appendChild(resultContent);
+  
+  // Add to tool call div
+  if (!toolCallDiv.contains(resultContainer)) {
+    toolCallDiv.appendChild(resultContainer);
+  }
+  
+  // Expand the tool call div if collapsed
+  if (toolCallDiv.classList.contains('collapsed')) {
+    toolCallDiv.classList.remove('collapsed');
+    const toggle = toolCallDiv.querySelector('.toggle-arrow');
+    if (toggle) {
+      toggle.innerHTML = config.TOOL_DISPLAY.COLLAPSE_ARROW;
+    }
+  }
+  
+  // Scroll to the result
+  toolCallDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 /**

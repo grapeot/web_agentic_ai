@@ -14,5 +14,3 @@ html5lib
 asyncio
 nest_asyncio
 gunicorn
-markdown2
-bleach

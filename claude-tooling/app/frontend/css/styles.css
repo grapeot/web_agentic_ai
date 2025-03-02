@@ -685,12 +685,42 @@ pre code {
 }
 
 .tool-section-label {
-    font-size: 0.85rem;
     font-weight: 600;
-    color: var(--text-light);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.5rem;
+    color: var(--text-color);
+    padding: 8px 10px;
+    background-color: var(--bg-light);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+}
+
+.tool-section-label i {
+    margin-right: 8px;
+}
+
+.tool-section-label .toggle-arrow {
+    margin-left: auto;
+    transition: transform 0.2s ease;
+}
+
+.tool-section-label:hover {
+    background-color: var(--bg-hover);
+}
+
+.tool-section-label.collapsed {
+    margin-bottom: 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.tool-output .output-content,
+.tool-error .error-content {
+    transition: all 0.3s ease;
+    max-height: 500px;
+    overflow-y: auto;
 }
 
 .list-group-item {
@@ -749,95 +779,6 @@ pre code {
 
 .file-preview {
     margin: 1rem 0;
-    max-width: 100%;
-    height: auto;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-color);
-}
-
-.image-container {
-    margin: 1rem 0;
-    text-align: center;
-}
-
-.image-container img {
-    max-width: 100%;
-    height: auto;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
-    transition: transform var(--transition-normal);
-}
-
-.image-container img:hover {
-    transform: scale(1.01);
-    box-shadow: var(--shadow-md);
-}
-
-.markdown-content {
-    background-color: white;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 1rem;
-    margin: 1rem 0;
-    max-width: 100%;
-    overflow-x: auto;
-}
-
-.markdown-content img {
-    max-width: 100%;
-    height: auto;
-    border-radius: var(--radius-md);
-    margin: 1rem 0;
-    display: block;
-}
-
-.file-preview-thumbnail {
-    margin: 0.5rem 0;
-}
-
-.file-preview-thumbnail img {
-    max-width: 120px;
-    max-height: 80px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border-color);
-    cursor: pointer;
-}
-
-.file-result {
-    background-color: #fcfcfd;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    padding: 1rem;
-    margin: 1rem 0;
-}
-
-.file-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin: 1rem 0;
-}
-
-.file-actions a,
-.file-actions button {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.5rem 0.75rem;
-    background-color: white;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    font-size: 0.875rem;
-    color: var(--text-color);
-    text-decoration: none;
-    transition: all var(--transition-fast);
-    cursor: pointer;
-}
-
-.file-actions a:hover,
-.file-actions button:hover {
-    background-color: #f9fafb;
-    border-color: var(--primary-color);
-    color: var(--primary-color);
 }
 
 .image-preview {
@@ -1052,4 +993,183 @@ pre code {
 .thinking-content code {
     font-family: 'Fira Code', monospace;
     font-size: 0.9em;
+}
+
+/* Tool Generated Files */
+.tool-generated-files {
+  margin: 15px 0;
+  padding: 10px;
+  border-radius: 8px;
+  background-color: var(--card-bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.tool-files-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tool-files-header h5 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--primary-color);
+}
+
+.tool-files-header h5 i {
+  margin-right: 8px;
+}
+
+.tool-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tool-file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  border-radius: 4px;
+  background-color: var(--bg-light);
+  border: 1px solid var(--border-color);
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-icon {
+  color: var(--secondary-color);
+}
+
+.file-name {
+  font-weight: 500;
+}
+
+.file-size {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.file-actions {
+  display: flex;
+  gap: 5px;
+}
+
+/* Image Preview */
+.image-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.image-container {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 500px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.image-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.image-filename {
+  font-weight: 500;
+}
+
+/* Image Viewer Modal */
+.image-viewer-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.image-viewer-content {
+  background-color: var(--card-bg);
+  border-radius: 8px;
+  width: 90%;
+  max-width: 1200px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.image-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.image-viewer-title {
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.image-viewer-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.image-viewer-close:hover {
+  color: var(--danger-color);
+}
+
+.image-viewer-body {
+  padding: 15px;
+  overflow: auto;
+  text-align: center;
+  flex: 1;
+}
+
+.image-viewer-img {
+  max-width: 100%;
+  max-height: calc(90vh - 100px);
+  object-fit: contain;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .tool-file-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .file-actions {
+    margin-top: 8px;
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .image-viewer-content {
+    width: 95%;
+  }
 } 

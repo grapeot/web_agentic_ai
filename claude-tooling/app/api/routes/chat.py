@@ -71,12 +71,7 @@ async def chat(request: UserRequest, background_tasks: BackgroundTasks, conversa
         api_messages = []
         
         # Extract system message content for Claude API
-        system_content = """You are running in a headless environment. When generating code that creates visualizations or outputs, DO NOT use interactive elements like plt.show(), figure.show(), or display().
-
-Format your responses directly in HTML instead of Markdown. Use appropriate HTML tags like <h1>, <h2>, <p>, <ul>, <li>, <code>, <pre>, etc. to format your content.
-For code blocks, use <pre><code class="language-xxx">...</code></pre> with the appropriate language class.
-Ensure your HTML is valid and does not contain unsafe elements or attributes.
-"""
+        system_content = "You are running in a headless environment. When generating code that creates visualizations or outputs, DO NOT use interactive elements like plt.show(), figure.show(), or display()."
         
         for msg in request.messages:
             # Format message content for the API
@@ -258,18 +253,13 @@ async def submit_tool_results(
         logger.info("Sending tool result to Claude API")
         response = client.messages.create(
             model="claude-3-7-sonnet-20250219",
-            system="""You are running in a headless environment. When generating code that creates visualizations or outputs:
-1. DO NOT use interactive elements like plt.show(), figure.show(), or display()
-2. Instead, save outputs to files (e.g., plt.savefig('output.png'))
-3. For Python plots, use matplotlib's savefig() method
-4. For Jupyter-style outputs, write to files instead
-5. Always provide complete, self-contained code that can run without user interaction
-6. Assume your code runs in a script context, not an interactive notebook
-
-Format your responses directly in HTML instead of Markdown. Use appropriate HTML tags like <h1>, <h2>, <p>, <ul>, <li>, <code>, <pre>, etc. to format your content.
-For code blocks, use <pre><code class="language-xxx">...</code></pre> with the appropriate language class.
-Ensure your HTML is valid and does not contain unsafe elements or attributes.
-""",
+            system="You are running in a headless environment. When generating code that creates visualizations or outputs:\n"\
+                  "1. DO NOT use interactive elements like plt.show(), figure.show(), or display()\n"\
+                  "2. Instead, save outputs to files (e.g., plt.savefig('output.png'))\n"\
+                  "3. For Python plots, use matplotlib's savefig() method\n"\
+                  "4. For Jupyter-style outputs, write to files instead\n"\
+                  "5. Always provide complete, self-contained code that can run without user interaction\n"\
+                  "6. Assume your code runs in a script context, not an interactive notebook",
             messages=history,
             max_tokens=4096,
             temperature=1.0,  # Must be 1.0 when thinking is enabled
