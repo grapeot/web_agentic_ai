@@ -190,6 +190,9 @@ function addMessageToChat(role, content, type) {
     } else if (content.content) {
       // Handle object with direct content field
       textContent = content.content;
+    } else if (content.text) {
+      // Handle object with direct text field
+      textContent = content.text;
     }
   }
   
@@ -198,48 +201,34 @@ function addMessageToChat(role, content, type) {
     return;
   }
   
-  // Skip if this exact message content was already rendered
-  const processedMessages = document.querySelectorAll('.message');
-  for (const existingMessage of processedMessages) {
-    if (existingMessage.textContent.trim() === textContent.trim()) {
-      return;
-    }
+  // Skip if this exact message content was already processed
+  if (state.hasProcessedContent(textContent.trim())) {
+    console.log('Skipping already processed message:', textContent.substring(0, 50) + '...');
+    return;
   }
+  
+  // Mark this content as processed to prevent duplicates
+  state.addProcessedContent(textContent.trim());
   
   // Function to render markdown content
   const renderMarkdown = () => {
     try {
-      // Check if marked is available and is a function
-      if (window.marked && typeof window.marked === 'function') {
-        messageDiv.innerHTML = window.marked(textContent);
-        // Apply syntax highlighting to code blocks
-        messageDiv.querySelectorAll('pre code').forEach(block => {
-          if (window.hljs) {
-            try {
-              window.hljs.highlightElement(block);
-            } catch (e) {
-              console.error('Error highlighting code block:', e);
-            }
-          }
-        });
-      } else {
-        // If marked is not available, display as plain text with line breaks
-        messageDiv.innerHTML = textContent.replace(/\n/g, '<br>');
-      }
+      // Simple plain text rendering - no markdown, escape HTML for security
+      const safeText = escapeHtml(textContent).replace(/\n/g, '<br>');
+      messageDiv.innerHTML = safeText;
+      
+      // We can't apply syntax highlighting anymore since we're escaping everything
     } catch (error) {
-      console.error('Error parsing markdown:', error);
+      console.error('Error parsing text:', error);
       // Fallback to plain text with line breaks
-      messageDiv.innerHTML = textContent.replace(/\n/g, '<br>');
+      messageDiv.innerHTML = escapeHtml(textContent).replace(/\n/g, '<br>');
     }
   };
 
-  // First attempt to render
+  // Render content immediately
   renderMarkdown();
   
-  // If marked is not available yet, try again after a short delay
-  if (!window.marked || typeof window.marked !== 'function') {
-    setTimeout(renderMarkdown, 100);
-  }
+  // No need for delayed rendering since we're not using marked
   
   // Only append if we have content
   if (messageDiv.textContent || messageDiv.innerHTML) {
@@ -275,7 +264,7 @@ function addThinkingToChat(content) {
   // Add thinking content
   const contentDiv = document.createElement('div');
   contentDiv.classList.add('thinking-content');
-  contentDiv.innerHTML = marked.parse(content);
+  contentDiv.innerHTML = escapeHtml(content).replace(/\n/g, '<br>'); // Plain text with line breaks, escaped
   
   thinkingDiv.appendChild(toggleBtn);
   thinkingDiv.appendChild(contentDiv);
@@ -746,18 +735,16 @@ function fetchAndDisplayMarkdown(url, container) {
     .then(response => response.text())
     .then(markdown => {
       try {
-        container.innerHTML = marked.parse(markdown);
-        container.querySelectorAll('pre code').forEach(block => {
-          hljs.highlightElement(block);
-        });
+        // Display as plain text with line breaks, escape HTML for security
+        container.innerHTML = escapeHtml(markdown).replace(/\n/g, '<br>');
       } catch (err) {
-        console.error('Error rendering markdown:', err);
-        container.textContent = markdown;
+        console.error('Error rendering content:', err);
+        container.textContent = markdown; // Use textContent for safety
       }
     })
     .catch(err => {
-      console.error('Error fetching markdown:', err);
-      container.textContent = 'Error loading markdown content';
+      console.error('Error fetching content:', err);
+      container.textContent = 'Error loading content';
     });
 }
 
