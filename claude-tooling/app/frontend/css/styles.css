@@ -749,6 +749,95 @@ pre code {
 
 .file-preview {
     margin: 1rem 0;
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+}
+
+.image-container {
+    margin: 1rem 0;
+    text-align: center;
+}
+
+.image-container img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    transition: transform var(--transition-normal);
+}
+
+.image-container img:hover {
+    transform: scale(1.01);
+    box-shadow: var(--shadow-md);
+}
+
+.markdown-content {
+    background-color: white;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin: 1rem 0;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.markdown-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius-md);
+    margin: 1rem 0;
+    display: block;
+}
+
+.file-preview-thumbnail {
+    margin: 0.5rem 0;
+}
+
+.file-preview-thumbnail img {
+    max-width: 120px;
+    max-height: 80px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+}
+
+.file-result {
+    background-color: #fcfcfd;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.file-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+.file-actions a,
+.file-actions button {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    background-color: white;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    color: var(--text-color);
+    text-decoration: none;
+    transition: all var(--transition-fast);
+    cursor: pointer;
+}
+
+.file-actions a:hover,
+.file-actions button:hover {
+    background-color: #f9fafb;
+    border-color: var(--primary-color);
+    color: var(--primary-color);
 }
 
 .image-preview {

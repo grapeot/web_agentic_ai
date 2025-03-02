@@ -399,58 +399,140 @@ function processFileResults(result, isMultiple = false) {
   console.log("[DEBUG] processFileResults called with:", JSON.stringify(result, null, 2));
   console.log("[DEBUG] isMultiple:", isMultiple);
 
-  // First check if result has markdown_render and render_type fields for direct rendering
-  if (!isMultiple && result.markdown_render && result.render_type === "image") {
-    console.log("[DEBUG] Rendering direct image from markdown_render");
-    console.log("[DEBUG] Image URL:", result.file_url);
+  // Check if result is an array of files
+  if (isMultiple && Array.isArray(result.files)) {
+    console.log("[DEBUG] Processing multiple files:", result.files.length);
+    // Generate list for multiple files
     return `
-      <div class="file-result">
-        <h4>${escapeHtml(result.file_path ? result.file_path.split('/').pop() : 'Generated Image')}</h4>
-        <img src="${result.file_url}" alt="Generated image" class="file-preview" />
-        <div class="file-actions">
-          <a href="${result.file_url}" download class="download-link">Download Image</a>
-        </div>
-        <div class="file-details-toggle">Details ${TOOL_DISPLAY.EXPAND_ARROW}</div>
-        <div class="file-details" style="display:none;">
-          <pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>
-        </div>
+      <div class="file-results-container">
+        <h4>Generated Files (${result.files.length})</h4>
+        <ul class="file-list">
+          ${result.files.map(file => generateFileListItem(file)).join('')}
+        </ul>
       </div>
     `;
   }
 
-  if (isMultiple && Array.isArray(result.files)) {
-    // Multiple files display
-    console.log("[DEBUG] Rendering multiple files:", result.files.length);
-    let filesHtml = `
-      <div class="generated-files">
-        <h4>Generated Files (${result.files.length})</h4>
-        <ul class="files-list">
-    `;
+  // For single file result
+  if (!isMultiple) {
+    // For single file in files array
+    if (result.files && result.files.length === 1) {
+      console.log("[DEBUG] Processing single file from files array");
+      // Extract the single file for processing
+      const singleFile = result.files[0];
+      
+      // Check if file has markdown_render field
+      if (singleFile.markdown_render) {
+        console.log("[DEBUG] Found markdown_render in single file:", singleFile.markdown_render);
+        
+        // Special handling for image files with markdown_render
+        if (singleFile.render_type === "image" || 
+            (singleFile.content_type && singleFile.content_type.startsWith('image/'))) {
+          console.log("[DEBUG] Rendering image from markdown_render");
+          console.log("[DEBUG] Image URL:", singleFile.file_url);
+          
+          return `
+            <div class="file-result">
+              <h4>${escapeHtml(singleFile.file_name || singleFile.file_path?.split('/').pop() || 'Generated Image')}</h4>
+              <div class="image-container">
+                <img src="${singleFile.file_url}" alt="Generated image" class="file-preview" />
+              </div>
+              <div class="file-actions">
+                <a href="${singleFile.file_url}" download class="download-link">Download Image</a>
+              </div>
+              <div class="file-details-toggle">Details ${TOOL_DISPLAY.EXPAND_ARROW}</div>
+              <div class="file-details" style="display:none;">
+                <pre>${escapeHtml(JSON.stringify(singleFile, null, 2))}</pre>
+              </div>
+            </div>
+          `;
+        }
+      }
+      
+      // Default handling for single file
+      return generateFileActions(singleFile);
+    }
     
-    result.files.forEach(file => {
-      console.log("[DEBUG] Processing file in multiple files:", file.name || file.file_path);
-      filesHtml += generateFileListItem(file);
-    });
-    
-    filesHtml += `
-        </ul>
-        <div class="files-details-toggle">Details ${TOOL_DISPLAY.EXPAND_ARROW}</div>
-        <div class="files-details" style="display:none;">
-          <pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>
+    // Direct file result (not in files array)
+    if (result.markdown_render && result.render_type === "image") {
+      console.log("[DEBUG] Rendering direct image from markdown_render");
+      console.log("[DEBUG] Image URL:", result.file_url);
+      return `
+        <div class="file-result">
+          <h4>${escapeHtml(result.file_name || result.file_path?.split('/').pop() || 'Generated Image')}</h4>
+          <div class="image-container">
+            <img src="${result.file_url}" alt="Generated image" class="file-preview" />
+          </div>
+          <div class="file-actions">
+            <a href="${result.file_url}" download class="download-link">Download Image</a>
+          </div>
+          <div class="file-details-toggle">Details ${TOOL_DISPLAY.EXPAND_ARROW}</div>
+          <div class="file-details" style="display:none;">
+            <pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    }
     
-    return filesHtml;
-  } else {
-    // Single file display
-    const file = isMultiple ? result.files[0] : result;
-    console.log("[DEBUG] Rendering single file:", file.name || file.file_path);
+    // Use the direct markdown_render content if available
+    if (result.markdown_render && typeof result.markdown_render === 'string') {
+      console.log("[DEBUG] Rendering content from direct markdown_render");
+      return `
+        <div class="markdown-result">
+          <div class="markdown-content">${result.markdown_render}</div>
+        </div>
+      `;
+    }
+    
+    // Default handling for direct result
+    return generateFileActions(result);
+  }
+
+  // Fallback for unexpected result structure
+  console.log("[DEBUG] No recognizable file structure, returning generic result");
+  return `
+    <div class="result-data">
+      <pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>
+    </div>
+  `;
+}
+
+/**
+ * Generate actions section for a file
+ * @param {Object} file - File object
+ * @returns {string} Actions HTML
+ */
+function generateFileActions(file) {
+  console.log("[DEBUG] generateFileActions called for file:", file.file_name || file.file_path);
+  
+  const fileName = file.file_name || (file.file_path ? file.file_path.split('/').pop() : 'File');
+  const fileUrl = file.file_url || file.url;
+  
+  if (!fileUrl) {
+    console.log("[DEBUG] No file URL available for actions");
     return `
       <div class="file-result">
-        <h4>${escapeHtml(file.name || file.file_path?.split('/').pop() || 'Generated File')}</h4>
-        ${generateFilePreview(file)}
-        ${generateFileActions(file)}
+        <h4>${escapeHtml(fileName)}</h4>
+        <div class="file-error">No file URL available</div>
+      </div>
+    `;
+  }
+  
+  // Check for markdown_render with render_type first
+  if (file.markdown_render && (file.render_type === "image" || 
+      (file.content_type && file.content_type.startsWith('image/')))) {
+    console.log("[DEBUG] Generating full file result for markdown_render image");
+    console.log("[DEBUG] Image URL:", fileUrl);
+    return `
+      <div class="file-result">
+        <h4>${escapeHtml(fileName)}</h4>
+        <div class="image-container">
+          <img src="${fileUrl}" alt="${escapeHtml(fileName)}" class="file-preview" />
+        </div>
+        <div class="file-actions">
+          <a href="${fileUrl}" target="_blank" class="view-link">View Full Size</a>
+          <a href="${fileUrl}" download="${fileName}" class="download-link">Download</a>
+        </div>
         <div class="file-details-toggle">Details ${TOOL_DISPLAY.EXPAND_ARROW}</div>
         <div class="file-details" style="display:none;">
           <pre>${escapeHtml(JSON.stringify(file, null, 2))}</pre>
@@ -458,6 +540,61 @@ function processFileResults(result, isMultiple = false) {
       </div>
     `;
   }
+  
+  // Handle by file type
+  const isImage = (file.mime_type && file.mime_type.startsWith('image/')) || 
+                 (file.content_type && file.content_type.startsWith('image/')) ||
+                 (file.render_type === 'image');
+  const isMarkdown = file.file_name && file.file_name.endsWith('.md');
+  const isHtml = file.file_name && (file.file_name.endsWith('.html') || file.file_name.endsWith('.htm'));
+  
+  console.log("[DEBUG] File type detection - isImage:", isImage, "isMarkdown:", isMarkdown, "isHtml:", isHtml);
+  
+  // Generate appropriate actions based on file type
+  let previewHtml = generateFilePreview(file);
+  let actionsHtml = '';
+  
+  if (isImage) {
+    actionsHtml = `
+      <div class="file-actions">
+        <a href="${fileUrl}" target="_blank" class="view-link">View Full Size</a>
+        <a href="${fileUrl}" download="${fileName}" class="download-link">Download</a>
+      </div>
+    `;
+  } else if (isMarkdown) {
+    actionsHtml = `
+      <div class="file-actions">
+        <button class="view-markdown-btn" data-url="${fileUrl}">View Markdown</button>
+        <a href="${fileUrl}" download="${fileName}" class="download-link">Download</a>
+      </div>
+    `;
+  } else if (isHtml) {
+    actionsHtml = `
+      <div class="file-actions">
+        <button class="view-html-btn" data-url="${fileUrl}">View HTML</button>
+        <a href="${fileUrl}" target="_blank" class="view-link">Open in new tab</a>
+        <a href="${fileUrl}" download="${fileName}" class="download-link">Download</a>
+      </div>
+    `;
+  } else {
+    actionsHtml = `
+      <div class="file-actions">
+        <a href="${fileUrl}" download="${fileName}" class="download-link">Download</a>
+      </div>
+    `;
+  }
+  
+  return `
+    <div class="file-result">
+      <h4>${escapeHtml(fileName)}</h4>
+      ${previewHtml}
+      ${actionsHtml}
+      <div class="file-details-toggle">Details ${TOOL_DISPLAY.EXPAND_ARROW}</div>
+      <div class="file-details" style="display:none;">
+        <pre>${escapeHtml(JSON.stringify(file, null, 2))}</pre>
+      </div>
+    </div>
+  `;
 }
 
 /**
@@ -466,30 +603,43 @@ function processFileResults(result, isMultiple = false) {
  * @returns {string} Preview HTML
  */
 function generateFilePreview(file) {
-  console.log("[DEBUG] generateFilePreview called for file:", file.name || file.file_path);
+  console.log("[DEBUG] generateFilePreview called for file:", file.file_name || file.file_path);
   
-  // First check for markdown_render with render_type, which is the modern way
-  if (file.markdown_render && file.render_type === "image") {
-    console.log("[DEBUG] Generating preview for markdown_render image");
-    console.log("[DEBUG] Image URL:", file.file_url);
-    return `<img src="${file.file_url}" alt="${escapeHtml(file.file_path?.split('/').pop() || 'Generated image')}" class="file-preview" />`;
+  const fileUrl = file.file_url || file.url;
+  if (!fileUrl) {
+    console.log("[DEBUG] No URL available for preview");
+    return '';
   }
   
+  // First check for markdown_render with render_type, which is the modern way
+  if (file.markdown_render && (file.render_type === "image" || 
+     (file.content_type && file.content_type.startsWith('image/')))) {
+    console.log("[DEBUG] Generating preview for markdown_render image");
+    console.log("[DEBUG] Image URL:", fileUrl);
+    return `
+      <div class="image-container">
+        <img src="${fileUrl}" alt="${escapeHtml(file.file_name || file.file_path?.split('/').pop() || 'Generated image')}" class="file-preview" />
+      </div>
+    `;
+  }
+  
+  // Handle by file type
   const isImage = file.mime_type && file.mime_type.startsWith('image/') || 
                  (file.content_type && file.content_type.startsWith('image/')) ||
                  (file.render_type === 'image');
-  const isMarkdown = file.name && file.name.endsWith('.md');
-  const isHtml = file.name && (file.name.endsWith('.html') || file.name.endsWith('.htm'));
+  const isMarkdown = file.file_name && file.file_name.endsWith('.md');
+  const isHtml = file.file_name && (file.file_name.endsWith('.html') || file.file_name.endsWith('.htm'));
   
   console.log("[DEBUG] File type detection - isImage:", isImage, "isMarkdown:", isMarkdown, "isHtml:", isHtml);
-  console.log("[DEBUG] File URL properties - url:", file.url, "file_url:", file.file_url);
   
-  if (isImage && (file.url || file.file_url)) {
-    const imageUrl = file.url || file.file_url;
-    console.log("[DEBUG] Generating preview for standard image, URL:", imageUrl);
-    return `<img src="${imageUrl}" alt="${escapeHtml(file.name || file.file_path?.split('/').pop() || 'Generated image')}" class="file-preview" />`;
-  } else if (isMarkdown && (file.url || file.file_url)) {
-    const fileUrl = file.url || file.file_url;
+  if (isImage) {
+    console.log("[DEBUG] Generating preview for standard image, URL:", fileUrl);
+    return `
+      <div class="image-container">
+        <img src="${fileUrl}" alt="${escapeHtml(file.file_name || file.file_path?.split('/').pop() || 'Generated image')}" class="file-preview" />
+      </div>
+    `;
+  } else if (isMarkdown) {
     console.log("[DEBUG] Generating markdown preview buttons, URL:", fileUrl);
     return `
       <div class="markdown-actions">
@@ -497,8 +647,7 @@ function generateFilePreview(file) {
       </div>
       <div class="markdown-preview" style="display:none;"></div>
     `;
-  } else if (isHtml && (file.url || file.file_url)) {
-    const fileUrl = file.url || file.file_url;
+  } else if (isHtml) {
     console.log("[DEBUG] Generating HTML preview buttons, URL:", fileUrl);
     return `
       <div class="html-actions">
@@ -508,32 +657,9 @@ function generateFilePreview(file) {
       <div class="html-preview" style="display:none;"></div>
     `;
   }
+  
   console.log("[DEBUG] No preview generated for file");
   return '';
-}
-
-/**
- * Generate actions section for a file
- * @param {Object} file - File object
- * @returns {string} Actions HTML
- */
-function generateFileActions(file) {
-  const fileUrl = file.url || file.file_url;
-  console.log("[DEBUG] generateFileActions called with fileUrl:", fileUrl);
-  
-  if (!fileUrl) {
-    console.log("[DEBUG] No file URL found, skipping actions");
-    return '';
-  }
-  
-  const fileName = file.name || file.file_path?.split('/').pop();
-  console.log("[DEBUG] Generating download link with fileName:", fileName);
-  
-  return `
-    <div class="file-actions">
-      <a href="${fileUrl}" download="${fileName}" class="download-link">Download File</a>
-    </div>
-  `;
 }
 
 /**
@@ -542,54 +668,50 @@ function generateFileActions(file) {
  * @returns {string} List item HTML
  */
 function generateFileListItem(file) {
-  console.log("[DEBUG] generateFileListItem called for file:", file.name || file.file_path);
+  console.log("[DEBUG] generateFileListItem called for file:", file.file_name || file.file_path);
   
-  // Check for markdown_render and render_type
-  if (file.markdown_render && file.render_type === "image") {
-    console.log("[DEBUG] Generating list item for markdown_render image");
-    console.log("[DEBUG] Image URL:", file.file_url);
+  const fileUrl = file.file_url || file.url;
+  const fileName = file.file_name || (file.file_path ? file.file_path.split('/').pop() : 'File');
+  
+  if (!fileUrl) {
+    console.log("[DEBUG] No URL available for file in list");
     return `
       <li class="file-item">
-        <span class="file-name">${escapeHtml(file.file_path ? file.file_path.split('/').pop() : 'Image')}</span>
+        <span class="file-name">${escapeHtml(fileName)}</span>
+        <div class="file-error">No URL available</div>
+      </li>
+    `;
+  }
+  
+  // Check for markdown_render and render_type
+  if (file.markdown_render && (file.render_type === "image" || 
+      (file.content_type && file.content_type.startsWith('image/')))) {
+    console.log("[DEBUG] Generating list item for markdown_render image");
+    console.log("[DEBUG] Image URL:", fileUrl);
+    return `
+      <li class="file-item">
+        <span class="file-name">${escapeHtml(fileName)}</span>
         <div class="file-preview-thumbnail">
-          <img src="${file.file_url}" alt="Image thumbnail" class="thumbnail" />
+          <img src="${fileUrl}" alt="Image thumbnail" class="thumbnail" />
         </div>
         <div class="file-actions">
-          <a href="${file.file_url}" target="_blank" class="view-link">View</a>
-          <a href="${file.file_url}" download class="download-link">Download</a>
+          <a href="${fileUrl}" target="_blank" class="view-link">View</a>
+          <a href="${fileUrl}" download="${fileName}" class="download-link">Download</a>
         </div>
       </li>
     `;
   }
 
-  const isMarkdown = file.name && file.name.endsWith('.md');
-  const isHtml = file.name && (file.name.endsWith('.html') || file.name.endsWith('.htm'));
+  // Handle by file type
+  const isMarkdown = file.file_name && file.file_name.endsWith('.md');
+  const isHtml = file.file_name && (file.file_name.endsWith('.html') || file.file_name.endsWith('.htm'));
   const isImage = (file.mime_type && file.mime_type.startsWith('image/')) || 
                  (file.content_type && file.content_type.startsWith('image/')) ||
                  (file.render_type === 'image');
   
   console.log("[DEBUG] In list item - File type detection - isImage:", isImage, "isMarkdown:", isMarkdown, "isHtml:", isHtml);
   
-  const fileUrl = file.url || file.file_url;
-  const fileName = file.name || (file.file_path ? file.file_path.split('/').pop() : 'File');
-  
-  console.log("[DEBUG] File URL in list item:", fileUrl);
-  console.log("[DEBUG] File name in list item:", fileName);
-  
-  let actionsHtml = '';
-  if (fileUrl) {
-    if (isMarkdown) {
-      actionsHtml += `<button class="view-markdown-btn" data-url="${fileUrl}">View</button>`;
-    } else if (isHtml) {
-      actionsHtml += `<button class="view-html-btn" data-url="${fileUrl}">View</button>`;
-    } else if (isImage) {
-      actionsHtml += `<a href="${fileUrl}" target="_blank" class="view-link">View</a>`;
-    }
-    
-    actionsHtml += `<a href="${fileUrl}" download="${fileName}" class="download-link">Download</a>`;
-    console.log("[DEBUG] Generated actions HTML:", actionsHtml);
-  }
-  
+  // Generate preview if it's an image
   let previewHtml = '';
   if (isImage && fileUrl) {
     previewHtml = `
@@ -600,6 +722,20 @@ function generateFileListItem(file) {
     console.log("[DEBUG] Generated preview HTML for image");
   }
   
+  // Generate appropriate actions based on file type
+  let actionsHtml = '';
+  if (isMarkdown) {
+    actionsHtml += `<button class="view-markdown-btn" data-url="${fileUrl}">View</button>`;
+  } else if (isHtml) {
+    actionsHtml += `<button class="view-html-btn" data-url="${fileUrl}">View</button>`;
+  } else if (isImage) {
+    actionsHtml += `<a href="${fileUrl}" target="_blank" class="view-link">View</a>`;
+  }
+  
+  actionsHtml += `<a href="${fileUrl}" download="${fileName}" class="download-link">Download</a>`;
+  console.log("[DEBUG] Generated actions HTML:", actionsHtml);
+  
+  // Create final list item
   const listItemHtml = `
     <li class="file-item">
       <span class="file-name">${escapeHtml(fileName)}</span>
@@ -655,6 +791,13 @@ function addToolResultToChat(result, toolUseId) {
     console.log("[DEBUG] Parsed tool result:", JSON.stringify(parsedResult, null, 2));
     
     if (typeof parsedResult === 'object' && parsedResult !== null) {
+      // Check for markdown_render field - this is a key indicator for rendering content as HTML
+      const hasMarkdownContent = parsedResult.markdown_render || 
+                               (parsedResult.format === 'html') ||
+                               (parsedResult.files && parsedResult.files.some(f => f.markdown_render));
+      
+      console.log("[DEBUG] Has markdown content:", hasMarkdownContent);
+      
       if (parsedResult.status === 'success' && parsedResult.message) {
         // Handle successful operation result
         console.log("[DEBUG] Handling success message:", parsedResult.message);
@@ -674,6 +817,11 @@ function addToolResultToChat(result, toolUseId) {
         const fileResultsHtml = processFileResults(parsedResult, Array.isArray(parsedResult.files));
         console.log("[DEBUG] Generated file results HTML length:", fileResultsHtml.length);
         contentDiv.innerHTML = fileResultsHtml;
+      } else if (parsedResult.markdown_render) {
+        // Handle direct markdown_render content
+        console.log("[DEBUG] Handling markdown_render content:", parsedResult.markdown_render);
+        // Use innerHTML to properly render the HTML content from markdown
+        contentDiv.innerHTML = `<div class="markdown-content">${parsedResult.markdown_render}</div>`;
       } else {
         // Handle other object results
         console.log("[DEBUG] Handling generic object result");
@@ -876,20 +1024,118 @@ function escapeHtml(text) {
  * @param {HTMLElement} container - Container to display markdown in
  */
 function fetchAndDisplayMarkdown(url, container) {
+  console.log("[DEBUG] fetchAndDisplayMarkdown called with URL:", url);
+  
+  // Show loading indicator
+  if (container.querySelector('.markdown-preview')) {
+    const preview = container.querySelector('.markdown-preview');
+    preview.style.display = 'block';
+    preview.innerHTML = '<div class="loading-indicator">Loading markdown...</div>';
+  }
+  
   fetch(url)
     .then(response => response.text())
     .then(markdown => {
       try {
-        // Display as plain text with line breaks, escape HTML for security
-        container.innerHTML = escapeHtml(markdown).replace(/\n/g, '<br>');
+        console.log("[DEBUG] Received markdown content, length:", markdown.length);
+        
+        // Check if we have access to marked library for proper Markdown rendering
+        if (window.marked) {
+          console.log("[DEBUG] Using marked library to convert markdown to HTML");
+          // Configure marked options
+          marked.setOptions({
+            breaks: true, // Add line breaks
+            gfm: true,    // Use GitHub Flavored Markdown
+            headerIds: true,
+            sanitize: false // We'll sanitize with DOMPurify if available
+          });
+          
+          // Convert markdown to HTML
+          const html = marked.parse(markdown);
+          console.log("[DEBUG] Converted markdown to HTML, checking for image tags");
+          
+          // Look for image tags
+          const imgPattern = /<img[^>]+>/g;
+          const imgTags = html.match(imgPattern);
+          if (imgTags) {
+            console.log("[DEBUG] Found image tags in HTML:", imgTags.length);
+          }
+          
+          // Use DOMPurify if available, otherwise use the HTML directly
+          let cleanHtml = window.DOMPurify ? DOMPurify.sanitize(html) : html;
+          
+          // Display in the preview container
+          if (container.querySelector('.markdown-preview')) {
+            const preview = container.querySelector('.markdown-preview');
+            preview.style.display = 'block';
+            preview.innerHTML = `
+              <div class="markdown-content">
+                ${cleanHtml}
+              </div>
+            `;
+            
+            // Make all links open in new tab
+            preview.querySelectorAll('a').forEach(a => {
+              a.setAttribute('target', '_blank');
+              a.setAttribute('rel', 'noopener noreferrer');
+            });
+            
+            // Add click handlers to images for expanded view
+            preview.querySelectorAll('img').forEach(img => {
+              img.addEventListener('click', function() {
+                window.open(this.src, '_blank');
+              });
+              img.style.cursor = 'pointer';
+            });
+          } else {
+            console.log("[DEBUG] No preview container found, creating one");
+            const preview = document.createElement('div');
+            preview.className = 'markdown-preview';
+            preview.style.display = 'block';
+            preview.innerHTML = `
+              <div class="markdown-content">
+                ${cleanHtml}
+              </div>
+            `;
+            container.appendChild(preview);
+          }
+        } else {
+          // Fallback to simple rendering with line breaks if marked library is not available
+          console.log("[DEBUG] Marked library not available, using fallback rendering");
+          
+          // Display as plain text with line breaks, escape HTML for security
+          if (container.querySelector('.markdown-preview')) {
+            const preview = container.querySelector('.markdown-preview');
+            preview.style.display = 'block';
+            preview.innerHTML = escapeHtml(markdown).replace(/\n/g, '<br>');
+          } else {
+            const preview = document.createElement('div');
+            preview.className = 'markdown-preview';
+            preview.style.display = 'block';
+            preview.innerHTML = escapeHtml(markdown).replace(/\n/g, '<br>');
+            container.appendChild(preview);
+          }
+        }
       } catch (err) {
-        console.error('Error rendering content:', err);
-        container.textContent = markdown; // Use textContent for safety
+        console.error('[ERROR] Error rendering markdown content:', err);
+        
+        // Fallback on error
+        if (container.querySelector('.markdown-preview')) {
+          const preview = container.querySelector('.markdown-preview');
+          preview.style.display = 'block';
+          preview.innerHTML = '<div class="error-message">Error rendering markdown</div>';
+          preview.appendChild(document.createTextNode(markdown)); // Add as text for safety
+        }
       }
     })
     .catch(err => {
-      console.error('Error fetching content:', err);
-      container.textContent = 'Error loading content';
+      console.error('[ERROR] Error fetching markdown content:', err);
+      
+      if (container.querySelector('.markdown-preview')) {
+        const preview = container.querySelector('.markdown-preview');
+        preview.style.display = 'block';
+        preview.innerHTML = '<div class="error-message">Error loading content: ' + err.message + '</div>';
+      }
     });
 }
 
