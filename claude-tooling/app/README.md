@@ -2,7 +2,7 @@
 
 ## Overview
 
-Claude Tooling is an integration platform that connects Claude 3.7 with local tools through a web interface. The application enables users to interact with Claude in a chat-like interface while allowing the AI to execute local commands, search files, and perform other actions through a defined set of tools.
+Claude Tooling is an integration platform that connects Claude 3.7 with local tools through a web interface. The application enables users to interact with Claude in a chat-like interface while allowing the AI to execute local commands, search files, and perform other actions through a defined set of tools. Each conversation is assigned a unique directory with a timestamp in the `runs` folder for better organization of generated files.
 
 ## Technology Stack
 
@@ -45,6 +45,8 @@ The API module provides the core functionality for the application:
    - Connects to Claude 3.7 through Anthropic's API
    - Manages conversation state and history
    - Processes tool calls from Claude
+   - Supports "thinking mode" to see Claude's reasoning process
+   - Maintains organized conversation directories with timestamps
 
 2. **Tool Framework**:
    - Implements various tools Claude can use:
@@ -63,7 +65,10 @@ The API module provides the core functionality for the application:
    - `/api/chat`: Main endpoint for chat interactions
    - `/api/tool-results`: Submit tool execution results
    - `/api/conversation`: Manage conversations
-   - `/api/files`: File operations within conversations
+   - `/api/conversation/{conversation_id}/files/{file_path:path}`: File operations within conversations
+   - `/api/conversation/{conversation_id}/cancel`: Cancel ongoing tool execution
+   - `/api/conversation/{conversation_id}/root`: Get conversation root directory
+   - `/api/tools`: Retrieve available tools
 
 ### Frontend Module
 
@@ -78,6 +83,9 @@ The frontend provides the user interface for interacting with Claude:
    - Display of tool execution requests
    - Manual approval of sensitive operations
    - Visualization of tool execution results
+   - Cancellation of in-progress auto-executing tools
+   - File preview with support for markdown, HTML, and images
+   - Collapsible tool calls and results for better organization
 
 ## Implementation Details
 
@@ -104,8 +112,11 @@ The frontend provides the user interface for interacting with Claude:
    - `tool_execution.py`: Processes and executes tool calls
 
 5. **Tools**:
-   - `tool_wrapper.py`: Defines the tool interface for Claude
-   - Various tool implementations (file, web, command)
+   - `tool_wrapper.py`: Defines the tool interface for Claude and provides post-processing capabilities
+   - `file_tools.py`: File reading, writing, and manipulation tools
+   - `command_tools.py`: Command execution and processing
+   - `web_tools.py`: Web search and content extraction
+   - Intelligent file detection: Uses Claude to detect generated files from command outputs
 
 ### Integration Points
 
@@ -134,7 +145,14 @@ The frontend provides the user interface for interacting with Claude:
 
 2. **Running the Application**:
    ```bash
-   python -m app.api.app
+   # Basic single-worker mode
+   python claude-tooling/run.py
+   
+   # Multi-worker mode for better concurrency
+   python claude-tooling/run.py --workers 4
+   
+   # Production mode with Gunicorn (Linux/Mac only)
+   python claude-tooling/run.py --use-gunicorn --workers 9
    ```
    The application will be available at `http://localhost:8000`
 
@@ -155,8 +173,12 @@ To add new tools for Claude:
 
 ## Behavior Guarantees
 
-- Tool execution is synchronous and blocking by default
-- Background tasks are used for continuous processing
+- Tool execution uses background tasks for asynchronous processing
+- Frontend polls for updates during tool execution
+- Tool execution can be cancelled by the user
 - All API responses include proper error handling
 - File operations are constrained to conversation directories
-- Command execution can be configured to require manual approval 
+- Command execution can be configured to require manual approval
+- Thinking mode support for seeing Claude's reasoning process
+- Automatic file detection identifies created files from commands
+- Enhanced file metadata for better rendering in the frontend 
