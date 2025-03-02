@@ -156,11 +156,11 @@ function clearChat() {
  * @param {string} type - Message type (text/thinking)
  */
 function addMessageToChat(role, content, type) {
-  console.log('Adding message type:', typeof content, role, content, type);
+  console.log(`[DEBUG] addMessageToChat called with role: ${role}, type: ${type}`);
+  console.log("[DEBUG] Content:", JSON.stringify(content, null, 2));
   
   // Skip only if type is explicitly set to THINKING
   if (type && type === MESSAGE_TYPES.THINKING) {
-    console.log('Skipping thinking message');
     return;
   }
 
@@ -178,29 +178,51 @@ function addMessageToChat(role, content, type) {
   let isHtml = false;
   
   if (typeof content === 'string') {
+    console.log("[DEBUG] Content is string type");
     textContent = content;
   } else if (content && typeof content === 'object') {
     if (Array.isArray(content)) {
+      console.log("[DEBUG] Content is array type with length:", content.length);
       // Handle array of content blocks
       // Check if any content blocks have HTML format
       isHtml = content.some(block => block.format === 'html');
+      console.log("[DEBUG] Array content contains HTML format:", isHtml);
       
-      textContent = content
-        .filter(block => block.type === 'text' && block.text)
-        .map(block => block.text)
-        .join('\n');
+      if (isHtml) {
+        // If HTML content is present, we need to handle each block properly
+        textContent = content
+          .filter(block => block.type === 'text' && block.text)
+          .map(block => {
+            console.log("[DEBUG] Processing block:", JSON.stringify(block, null, 2));
+            // Use the HTML content if available, otherwise escape the text
+            return block.format === 'html' ? block.text : escapeHtml(block.text).replace(/\n/g, '<br>');
+          })
+          .join('\n');
+      } else {
+        // For regular text content
+        textContent = content
+          .filter(block => block.type === 'text' && block.text)
+          .map(block => block.text)
+          .join('\n');
+      }
     } else if (content.type === 'text' && content.text) {
+      console.log("[DEBUG] Content is object with text field");
       // Handle single content object with type and text fields
       textContent = content.text;
       isHtml = content.format === 'html';
+      console.log("[DEBUG] Single content is HTML format:", isHtml);
     } else if (content.content) {
+      console.log("[DEBUG] Content has content field");
       // Handle object with direct content field
       textContent = content.content;
       isHtml = content.format === 'html';
+      console.log("[DEBUG] Content object is HTML format:", isHtml);
     } else if (content.text) {
+      console.log("[DEBUG] Content has text field");
       // Handle object with direct text field
       textContent = content.text;
       isHtml = content.format === 'html';
+      console.log("[DEBUG] Text object is HTML format:", isHtml);
     }
   }
   
@@ -211,7 +233,7 @@ function addMessageToChat(role, content, type) {
   
   // Skip if this exact message content was already processed
   if (state.hasProcessedContent(textContent.trim())) {
-    console.log('Skipping already processed message:', textContent.substring(0, 50) + '...');
+    console.log("[DEBUG] Skipping duplicate content");
     return;
   }
   
@@ -223,11 +245,11 @@ function addMessageToChat(role, content, type) {
     try {
       if (isHtml) {
         // For HTML content (preprocessed on backend)
-        console.log('Rendering as HTML content');
+        console.log("[DEBUG] Rendering as HTML content");
         messageDiv.innerHTML = textContent;
       } else {
         // Simple plain text rendering - escape HTML for security
-        console.log('Rendering as plain text');
+        console.log("[DEBUG] Rendering as plain text");
         const safeText = escapeHtml(textContent).replace(/\n/g, '<br>');
         messageDiv.innerHTML = safeText;
       }
@@ -241,12 +263,11 @@ function addMessageToChat(role, content, type) {
   // Render content immediately
   renderContent();
   
-  // No need for delayed rendering since we're not using marked
-  
   // Only append if we have content
   if (messageDiv.textContent || messageDiv.innerHTML) {
     const chatMessages = document.getElementById('chat-messages');
     if (chatMessages) {
+      console.log("[DEBUG] Appending message to chat, innerHTML length:", messageDiv.innerHTML.length);
       chatMessages.appendChild(messageDiv);
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
@@ -299,8 +320,6 @@ function addThinkingToChat(content) {
 function addToolCallToChat(toolCall) {
   if (!elements.chatMessages) return;
   
-  console.log('Adding tool call to chat:', toolCall.name);
-  
   // Create tool call element
   const toolCallDiv = document.createElement('div');
   toolCallDiv.className = 'tool-call';
@@ -341,9 +360,6 @@ function addToolCallToChat(toolCall) {
   // Scroll to bottom
   elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
   
-  // Debug state object
-  console.log('State object in addToolCallToChat:', state);
-  
   // Show tool result modal if auto-execute is disabled
   try {
     if (typeof state.getSettings === 'function') {
@@ -380,8 +396,31 @@ function addToolCallToChat(toolCall) {
  * @returns {string} Formatted HTML
  */
 function processFileResults(result, isMultiple = false) {
+  console.log("[DEBUG] processFileResults called with:", JSON.stringify(result, null, 2));
+  console.log("[DEBUG] isMultiple:", isMultiple);
+
+  // First check if result has markdown_render and render_type fields for direct rendering
+  if (!isMultiple && result.markdown_render && result.render_type === "image") {
+    console.log("[DEBUG] Rendering direct image from markdown_render");
+    console.log("[DEBUG] Image URL:", result.file_url);
+    return `
+      <div class="file-result">
+        <h4>${escapeHtml(result.file_path ? result.file_path.split('/').pop() : 'Generated Image')}</h4>
+        <img src="${result.file_url}" alt="Generated image" class="file-preview" />
+        <div class="file-actions">
+          <a href="${result.file_url}" download class="download-link">Download Image</a>
+        </div>
+        <div class="file-details-toggle">Details ${TOOL_DISPLAY.EXPAND_ARROW}</div>
+        <div class="file-details" style="display:none;">
+          <pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>
+        </div>
+      </div>
+    `;
+  }
+
   if (isMultiple && Array.isArray(result.files)) {
     // Multiple files display
+    console.log("[DEBUG] Rendering multiple files:", result.files.length);
     let filesHtml = `
       <div class="generated-files">
         <h4>Generated Files (${result.files.length})</h4>
@@ -389,6 +428,7 @@ function processFileResults(result, isMultiple = false) {
     `;
     
     result.files.forEach(file => {
+      console.log("[DEBUG] Processing file in multiple files:", file.name || file.file_path);
       filesHtml += generateFileListItem(file);
     });
     
@@ -405,9 +445,10 @@ function processFileResults(result, isMultiple = false) {
   } else {
     // Single file display
     const file = isMultiple ? result.files[0] : result;
+    console.log("[DEBUG] Rendering single file:", file.name || file.file_path);
     return `
       <div class="file-result">
-        <h4>${escapeHtml(file.name || 'Generated File')}</h4>
+        <h4>${escapeHtml(file.name || file.file_path?.split('/').pop() || 'Generated File')}</h4>
         ${generateFilePreview(file)}
         ${generateFileActions(file)}
         <div class="file-details-toggle">Details ${TOOL_DISPLAY.EXPAND_ARROW}</div>
@@ -425,28 +466,49 @@ function processFileResults(result, isMultiple = false) {
  * @returns {string} Preview HTML
  */
 function generateFilePreview(file) {
-  const isImage = file.mime_type && file.mime_type.startsWith('image/');
+  console.log("[DEBUG] generateFilePreview called for file:", file.name || file.file_path);
+  
+  // First check for markdown_render with render_type, which is the modern way
+  if (file.markdown_render && file.render_type === "image") {
+    console.log("[DEBUG] Generating preview for markdown_render image");
+    console.log("[DEBUG] Image URL:", file.file_url);
+    return `<img src="${file.file_url}" alt="${escapeHtml(file.file_path?.split('/').pop() || 'Generated image')}" class="file-preview" />`;
+  }
+  
+  const isImage = file.mime_type && file.mime_type.startsWith('image/') || 
+                 (file.content_type && file.content_type.startsWith('image/')) ||
+                 (file.render_type === 'image');
   const isMarkdown = file.name && file.name.endsWith('.md');
   const isHtml = file.name && (file.name.endsWith('.html') || file.name.endsWith('.htm'));
   
-  if (isImage && file.url) {
-    return `<img src="${file.url}" alt="${escapeHtml(file.name)}" class="file-preview" />`;
-  } else if (isMarkdown && file.url) {
+  console.log("[DEBUG] File type detection - isImage:", isImage, "isMarkdown:", isMarkdown, "isHtml:", isHtml);
+  console.log("[DEBUG] File URL properties - url:", file.url, "file_url:", file.file_url);
+  
+  if (isImage && (file.url || file.file_url)) {
+    const imageUrl = file.url || file.file_url;
+    console.log("[DEBUG] Generating preview for standard image, URL:", imageUrl);
+    return `<img src="${imageUrl}" alt="${escapeHtml(file.name || file.file_path?.split('/').pop() || 'Generated image')}" class="file-preview" />`;
+  } else if (isMarkdown && (file.url || file.file_url)) {
+    const fileUrl = file.url || file.file_url;
+    console.log("[DEBUG] Generating markdown preview buttons, URL:", fileUrl);
     return `
       <div class="markdown-actions">
-        <button class="view-markdown-btn" data-url="${file.url}">View Markdown</button>
+        <button class="view-markdown-btn" data-url="${fileUrl}">View Markdown</button>
       </div>
       <div class="markdown-preview" style="display:none;"></div>
     `;
-  } else if (isHtml && file.url) {
+  } else if (isHtml && (file.url || file.file_url)) {
+    const fileUrl = file.url || file.file_url;
+    console.log("[DEBUG] Generating HTML preview buttons, URL:", fileUrl);
     return `
       <div class="html-actions">
-        <button class="view-html-btn" data-url="${file.url}">View HTML</button>
-        <a href="${file.url}" target="_blank" class="open-html-link">Open in new tab</a>
+        <button class="view-html-btn" data-url="${fileUrl}">View HTML</button>
+        <a href="${fileUrl}" target="_blank" class="open-html-link">Open in new tab</a>
       </div>
       <div class="html-preview" style="display:none;"></div>
     `;
   }
+  console.log("[DEBUG] No preview generated for file");
   return '';
 }
 
@@ -456,11 +518,20 @@ function generateFilePreview(file) {
  * @returns {string} Actions HTML
  */
 function generateFileActions(file) {
-  if (!file.url) return '';
+  const fileUrl = file.url || file.file_url;
+  console.log("[DEBUG] generateFileActions called with fileUrl:", fileUrl);
+  
+  if (!fileUrl) {
+    console.log("[DEBUG] No file URL found, skipping actions");
+    return '';
+  }
+  
+  const fileName = file.name || file.file_path?.split('/').pop();
+  console.log("[DEBUG] Generating download link with fileName:", fileName);
   
   return `
     <div class="file-actions">
-      <a href="${file.url}" download="${file.name}" class="download-link">Download File</a>
+      <a href="${fileUrl}" download="${fileName}" class="download-link">Download File</a>
     </div>
   `;
 }
@@ -471,25 +542,76 @@ function generateFileActions(file) {
  * @returns {string} List item HTML
  */
 function generateFileListItem(file) {
+  console.log("[DEBUG] generateFileListItem called for file:", file.name || file.file_path);
+  
+  // Check for markdown_render and render_type
+  if (file.markdown_render && file.render_type === "image") {
+    console.log("[DEBUG] Generating list item for markdown_render image");
+    console.log("[DEBUG] Image URL:", file.file_url);
+    return `
+      <li class="file-item">
+        <span class="file-name">${escapeHtml(file.file_path ? file.file_path.split('/').pop() : 'Image')}</span>
+        <div class="file-preview-thumbnail">
+          <img src="${file.file_url}" alt="Image thumbnail" class="thumbnail" />
+        </div>
+        <div class="file-actions">
+          <a href="${file.file_url}" target="_blank" class="view-link">View</a>
+          <a href="${file.file_url}" download class="download-link">Download</a>
+        </div>
+      </li>
+    `;
+  }
+
   const isMarkdown = file.name && file.name.endsWith('.md');
   const isHtml = file.name && (file.name.endsWith('.html') || file.name.endsWith('.htm'));
+  const isImage = (file.mime_type && file.mime_type.startsWith('image/')) || 
+                 (file.content_type && file.content_type.startsWith('image/')) ||
+                 (file.render_type === 'image');
+  
+  console.log("[DEBUG] In list item - File type detection - isImage:", isImage, "isMarkdown:", isMarkdown, "isHtml:", isHtml);
+  
+  const fileUrl = file.url || file.file_url;
+  const fileName = file.name || (file.file_path ? file.file_path.split('/').pop() : 'File');
+  
+  console.log("[DEBUG] File URL in list item:", fileUrl);
+  console.log("[DEBUG] File name in list item:", fileName);
   
   let actionsHtml = '';
-  if (isMarkdown && file.url) {
-    actionsHtml += `<button class="view-markdown-btn" data-url="${file.url}">View</button>`;
-  } else if (isHtml && file.url) {
-    actionsHtml += `<button class="view-html-btn" data-url="${file.url}">View</button>`;
-  }
-  if (file.url) {
-    actionsHtml += `<a href="${file.url}" download="${file.name}" class="download-link">Download</a>`;
+  if (fileUrl) {
+    if (isMarkdown) {
+      actionsHtml += `<button class="view-markdown-btn" data-url="${fileUrl}">View</button>`;
+    } else if (isHtml) {
+      actionsHtml += `<button class="view-html-btn" data-url="${fileUrl}">View</button>`;
+    } else if (isImage) {
+      actionsHtml += `<a href="${fileUrl}" target="_blank" class="view-link">View</a>`;
+    }
+    
+    actionsHtml += `<a href="${fileUrl}" download="${fileName}" class="download-link">Download</a>`;
+    console.log("[DEBUG] Generated actions HTML:", actionsHtml);
   }
   
-  return `
+  let previewHtml = '';
+  if (isImage && fileUrl) {
+    previewHtml = `
+      <div class="file-preview-thumbnail">
+        <img src="${fileUrl}" alt="Image thumbnail" class="thumbnail" />
+      </div>
+    `;
+    console.log("[DEBUG] Generated preview HTML for image");
+  }
+  
+  const listItemHtml = `
     <li class="file-item">
-      <span class="file-name">${escapeHtml(file.name || 'Unnamed File')}</span>
-      <div class="file-actions">${actionsHtml}</div>
+      <span class="file-name">${escapeHtml(fileName)}</span>
+      ${previewHtml}
+      <div class="file-actions">
+        ${actionsHtml}
+      </div>
     </li>
   `;
+  
+  console.log("[DEBUG] Final list item HTML length:", listItemHtml.length);
+  return listItemHtml;
 }
 
 /**
@@ -498,9 +620,10 @@ function generateFileListItem(file) {
  * @param {string} toolUseId - Tool use ID
  */
 function addToolResultToChat(result, toolUseId) {
-  if (!elements.chatMessages) return;
+  console.log("[DEBUG] addToolResultToChat called with toolUseId:", toolUseId);
+  console.log("[DEBUG] Tool result:", JSON.stringify(result, null, 2));
   
-  console.log('Adding tool result:', typeof result, result, 'for tool ID:', toolUseId);
+  if (!elements.chatMessages) return;
   
   const toolCallDiv = document.querySelector(`.tool-call[data-tool-use-id="${toolUseId}"]`);
   if (!toolCallDiv || toolCallDiv.querySelector('.tool-result')) {
@@ -529,10 +652,12 @@ function addToolResultToChat(result, toolUseId) {
   try {
     // Parse result if needed
     const parsedResult = typeof result === 'string' ? JSON.parse(result) : result;
+    console.log("[DEBUG] Parsed tool result:", JSON.stringify(parsedResult, null, 2));
     
     if (typeof parsedResult === 'object' && parsedResult !== null) {
       if (parsedResult.status === 'success' && parsedResult.message) {
         // Handle successful operation result
+        console.log("[DEBUG] Handling success message:", parsedResult.message);
         const statusContent = document.createElement('div');
         statusContent.className = 'tool-result-status';
         statusContent.innerHTML = generateStatusContent(parsedResult);
@@ -540,13 +665,18 @@ function addToolResultToChat(result, toolUseId) {
         
         // For save_file tool, also show the file content
         if (parsedResult.message.includes('File saved')) {
+          console.log("[DEBUG] Adding file content for saved file");
           appendFileContent(contentDiv, toolCallDiv, parsedResult);
         }
       } else if (parsedResult.files) {
         // Handle file results
-        contentDiv.innerHTML = processFileResults(parsedResult, Array.isArray(parsedResult.files));
+        console.log("[DEBUG] Processing file results, multiple files:", Array.isArray(parsedResult.files));
+        const fileResultsHtml = processFileResults(parsedResult, Array.isArray(parsedResult.files));
+        console.log("[DEBUG] Generated file results HTML length:", fileResultsHtml.length);
+        contentDiv.innerHTML = fileResultsHtml;
       } else {
         // Handle other object results
+        console.log("[DEBUG] Handling generic object result");
         const pre = document.createElement('pre');
         pre.className = 'result-json';
         pre.textContent = JSON.stringify(parsedResult, null, 2);
@@ -554,6 +684,7 @@ function addToolResultToChat(result, toolUseId) {
       }
     } else {
       // Handle primitive values
+      console.log("[DEBUG] Handling primitive result value");
       const textDiv = document.createElement('div');
       textDiv.className = 'result-text';
       textDiv.textContent = String(parsedResult);
@@ -575,6 +706,7 @@ function addToolResultToChat(result, toolUseId) {
       isCollapsed ? TOOL_DISPLAY.COLLAPSE_ARROW : TOOL_DISPLAY.EXPAND_ARROW;
   });
   
+  console.log("[DEBUG] Appending tool result to tool call div");
   toolCallDiv.appendChild(resultDiv);
   elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
 }

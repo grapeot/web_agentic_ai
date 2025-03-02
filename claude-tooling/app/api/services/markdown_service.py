@@ -67,18 +67,29 @@ class MarkdownService:
             }
         """
         if not text:
+            logger.debug("Empty text received, returning empty result")
             return {"text": "", "format": "text"}
+        
+        logger.info(f"Converting text to HTML, is_markdown: {is_markdown}, text length: {len(text)}")
         
         # Determine if text is likely Markdown if not explicitly specified
         if is_markdown is None:
             is_markdown = cls._is_likely_markdown(text)
-            logger.debug(f"Auto-detected content as {'Markdown' if is_markdown else 'plain text'}")
+            logger.info(f"Auto-detected content as {'Markdown' if is_markdown else 'plain text'}")
         
         # Process as plain text if not Markdown
         if not is_markdown:
+            logger.debug("Processing as plain text (not Markdown)")
             return {"text": text, "format": "text"}
         
         try:
+            logger.debug("Converting Markdown to HTML with markdown2")
+            
+            # Check for image links in markdown
+            image_matches = re.findall(r'!\[(.*?)\]\((.*?)\)', text)
+            if image_matches:
+                logger.info(f"Found {len(image_matches)} image links in Markdown: {image_matches}")
+            
             # Convert Markdown to HTML using markdown2
             html = markdown2.markdown(
                 text,
@@ -90,15 +101,30 @@ class MarkdownService:
                 ]
             )
             
+            # Log if img tags are present in the generated HTML
+            img_tags = re.findall(r'<img[^>]+>', html)
+            if img_tags:
+                logger.info(f"HTML contains {len(img_tags)} img tags: {img_tags}")
+            
             # Sanitize HTML to prevent XSS
+            logger.debug("Sanitizing HTML with bleach")
+            pre_sanitize_length = len(html)
             sanitized_html = bleach.clean(
                 html,
                 tags=cls.ALLOWED_TAGS,
                 attributes=cls.ALLOWED_ATTRIBUTES,
                 strip=True
             )
+            post_sanitize_length = len(sanitized_html)
             
-            logger.debug("Successfully converted Markdown to HTML")
+            if pre_sanitize_length != post_sanitize_length:
+                logger.warning(f"HTML size changed during sanitization: {pre_sanitize_length} -> {post_sanitize_length}")
+                # Check if img tags were removed during sanitization
+                img_tags_after = re.findall(r'<img[^>]+>', sanitized_html)
+                if len(img_tags) != len(img_tags_after):
+                    logger.warning(f"Some img tags were filtered out by sanitization. Before: {len(img_tags)}, After: {len(img_tags_after)}")
+            
+            logger.info("Successfully converted Markdown to HTML, returning format: html")
             return {"text": sanitized_html, "format": "html"}
             
         except Exception as e:
@@ -124,19 +150,31 @@ class MarkdownService:
         # Count line breaks - plain text usually has more than Markdown
         line_breaks = text.count('\n')
         
+        # Check for image links specifically
+        image_links = re.findall(r'!\[(.*?)\]\((.*?)\)', text)
+        if image_links:
+            logger.info(f"Detected Markdown image links: {image_links}")
+            return True
+            
         # Check for Markdown patterns
         for pattern in cls.MARKDOWN_PATTERNS:
             if re.search(pattern, text, re.MULTILINE):
+                match = re.search(pattern, text, re.MULTILINE)
+                if match:
+                    logger.debug(f"Detected Markdown pattern: {pattern} with match: {match.group(0)[:30]}...")
                 return True
                 
         # Special case for documents like README.md
         if text.startswith('# ') or '## ' in text:
+            logger.debug("Detected Markdown headers")
             return True
             
         # Check for code blocks which are strong indicators of Markdown
         if '```' in text or text.count('`') >= 2:
+            logger.debug("Detected Markdown code blocks")
             return True
             
+        logger.debug("Text does not appear to be Markdown")
         return False
         
     @classmethod
@@ -151,14 +189,19 @@ class MarkdownService:
             Processed content with Markdown converted to HTML
         """
         if not content:
+            logger.debug("No content to process")
             return content
             
+        logger.info(f"Processing message content with {len(content)} blocks")
         processed_content = []
         
-        for item in content:
+        for i, item in enumerate(content):
+            logger.debug(f"Processing content block {i}, type: {item.get('type')}")
+            
             # Only process text type content
             if item.get("type") == "text":
                 text = item.get("text", "")
+                logger.info(f"Converting text block {i}, length: {len(text)}")
                 result = cls.convert_to_html(text)
                 
                 # Create a new content item with converted text
@@ -168,10 +211,13 @@ class MarkdownService:
                 # Add format field if it's HTML
                 if result["format"] == "html":
                     new_item["format"] = "html"
+                    logger.info(f"Block {i} was converted to HTML format")
                     
                 processed_content.append(new_item)
             else:
                 # Pass through non-text content unchanged
+                logger.debug(f"Passing through non-text content block: {item.get('type')}")
                 processed_content.append(item)
                 
+        logger.info(f"Processed {len(processed_content)} content blocks")
         return processed_content 

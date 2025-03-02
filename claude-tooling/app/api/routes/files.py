@@ -55,9 +55,24 @@ async def serve_conversation_file(conversation_id: str, file_path: str):
         file_size = os.path.getsize(full_path)
         logger.info(f"[FILE SERVING] File size: {file_size} bytes")
         
+        # Check file permissions
+        file_permissions = os.stat(full_path).st_mode
+        logger.info(f"[FILE SERVING] File permissions: {file_permissions:o}")
+        
         # Determine content type based on file extension
         content_type = get_file_content_type(file_path)
         logger.info(f"[FILE SERVING] Determined content type: {content_type}")
+        
+        # For image files, provide additional information
+        if content_type and content_type.startswith('image/'):
+            logger.info(f"[FILE SERVING] Serving image file: {file_path}")
+            try:
+                # Check if we can read the first bytes of the file
+                with open(full_path, 'rb') as f:
+                    first_bytes = f.read(16)
+                logger.info(f"[FILE SERVING] First bytes of image: {first_bytes.hex()}")
+            except Exception as e:
+                logger.warning(f"[FILE SERVING] Unable to read first bytes of image: {str(e)}")
         
         # Add additional headers for debugging
         headers = {
@@ -70,17 +85,23 @@ async def serve_conversation_file(conversation_id: str, file_path: str):
         # Ensure Cache-Control headers for proper browser caching
         if content_type and content_type.startswith('image/'):
             headers["Cache-Control"] = "public, max-age=3600"
+            logger.info("[FILE SERVING] Added cache headers for image file")
         
         logger.info(f"[FILE SERVING] Serving file with headers: {headers}")
         
         # Return the file as a response
-        logger.info(f"[FILE SERVING] Successfully serving file: {file_path}")
-        return FileResponse(
+        logger.info(f"[FILE SERVING] Successfully preparing FileResponse for: {file_path}")
+        
+        # Create the response 
+        response = FileResponse(
             path=full_path, 
             filename=os.path.basename(file_path),
             media_type=content_type,
             headers=headers
         )
+        
+        logger.info("[FILE SERVING] FileResponse created successfully")
+        return response
     except Exception as e:
         logger.error(f"[FILE SERVING] Error serving file: {str(e)}")
         import traceback
