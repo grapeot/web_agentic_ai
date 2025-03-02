@@ -393,8 +393,8 @@ async def test_resume_after_limit(mock_anthropic_client):
     with patch.object(background_tasks, 'add_task') as mock_add_task:
         # Call resume function
         from fastapi import HTTPException
-        # Mock the add_message_to_conversation function to prevent errors
-        with patch('app.api.routes.conversation.add_message_to_conversation') as mock_add_message:
+        # Mock the add_message_to_conversation function in the correct module
+        with patch('app.api.services.conversation.add_message_to_conversation') as mock_add_message:
             with patch('app.api.routes.conversation.process_tool_calls_and_continue') as mock_process:
                 # Mock the client in conversation router
                 from app.api.routes.conversation import client
