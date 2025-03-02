@@ -30,5 +30,55 @@ The goal is to help you maintain a big picture as well as the progress of the ta
   - Tool results should be included as content blocks in a user message, not as a separate `tool_outputs` parameter
   - Assistant messages containing `tool_use` blocks must be followed by user messages with matching `tool_result` blocks
   - Preserve the complete response structure in conversation history, not just the extracted text
+- In JavaScript class implementations, avoid using method names as property names to prevent naming conflicts. For example, don't use `this.isAutoExecutingTools = false` when you have a method called `isAutoExecutingTools()`. Use a different property name like `this.autoExecutingTools` instead.
+- When rendering chat messages:
+  - Use `innerHTML` instead of `textContent` when you want to render Markdown or HTML content 
+  - Track processed message IDs to avoid duplicating messages during polling operations
+  - Include proper handling of image elements in Markdown (error handling, responsive design)
+  - To prevent message duplication, especially for the first message, track both message IDs and content:
+    - Maintain a set of processed message content (`processedTextContent`) in addition to message IDs
+    - Check this set before displaying any message to avoid duplicates
+    - Update message processing functions across modules consistently (ensure main.js and tools.js agree on who displays messages)
+  - For proper line break handling in messages:
+    - Configure Marked library with `breaks: true` to convert line breaks to `<br>` tags
+    - Check for both spaces and newlines when concatenating message chunks to avoid adding unnecessary spaces
+    - Clean up consecutive line breaks by replacing 3+ consecutive line breaks with just 2
+    - Extract line break processing into a reusable function across the codebase
+    - Ensure consistent line break handling between the tools.js and ui.js modules
 
 # Scratchpad
+
+## Current Task: Rewrite frontend code in modular structure
+
+Files to update:
+[X] config.js - Configuration values and constants
+[X] state.js - State management using StateManager class
+[X] api.js - API interaction layer
+[X] utils.js - Utility functions
+[X] filePreview.js - File preview functionality
+[X] tools.js - Tool handling and auto-execution
+[X] events.js - Event handling and DOM interactions
+[X] main.js - Main application logic and initialization
+
+Progress:
+- Completed implementation of config.js with all configuration values
+- Implemented state.js with StateManager class for application state
+- Created api.js with all API interaction functions
+- Added utils.js with helper functions
+- Implemented filePreview.js for handling file previews
+- Completed tools.js with tool handling and auto-execution logic
+- Implemented events.js with event listeners and handlers
+- Created main.js to initialize and coordinate all modules
+
+✅ Task completed! The frontend code has been successfully rewritten into a modular structure while maintaining the same functionality. Each module has clear responsibilities:
+
+- config.js: Centralized configuration and constants
+- state.js: Application state management
+- api.js: API communication layer
+- utils.js: Reusable utility functions
+- filePreview.js: File preview functionality
+- tools.js: Tool handling and auto-execution
+- events.js: Event handling and DOM interactions
+- main.js: Application initialization and coordination
+
+The code is now more maintainable, testable, and follows better separation of concerns.
