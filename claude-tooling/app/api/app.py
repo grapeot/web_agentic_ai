@@ -48,9 +48,13 @@ try:
     )
     logger.info("Anthropic client initialized successfully")
 
-    # Inject the client into the chat router
+    # Inject the client into the chat and conversation routers
     from .routes.chat import set_anthropic_client
     set_anthropic_client(client)
+    
+    # Set client for conversation router for resume endpoint
+    from .routes.conversation import set_anthropic_client as set_conversation_anthropic_client
+    set_conversation_anthropic_client(client)
 
 except Exception as e:
     logger.error(f"Failed to initialize Anthropic client: {str(e)}")

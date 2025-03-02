@@ -10,7 +10,8 @@ import anthropic
 
 from ..services.conversation import (
     conversations, auto_execute_tasks, 
-    add_message_to_conversation, set_task_status
+    add_message_to_conversation, set_task_status,
+    get_auto_execute_count, increment_auto_execute_count, reset_auto_execute_count
 )
 from app.api.tools.tool_wrapper import (
     process_tool_calls,
@@ -224,16 +225,37 @@ async def process_tool_calls_and_continue(
                     
             # If there are new tool calls and automatic execution is enabled, recursively process
             if auto_execute_tools and new_tool_calls:
-                logger.info(f"Found {len(new_tool_calls)} new tool calls, continuing processing")
-                await process_tool_calls_and_continue(
-                    new_tool_calls, 
-                    conversation_id, 
-                    max_tokens, 
-                    thinking_mode, 
-                    thinking_budget_tokens,
-                    auto_execute_tools,
-                    client
-                )
+                # Increment the counter for this conversation and check for limit
+                current_count = increment_auto_execute_count(conversation_id)
+                logger.info(f"Found {len(new_tool_calls)} new tool calls, auto-execution count: {current_count}")
+                
+                # Check if we've reached the limit (10 calls)
+                if current_count > 10:
+                    logger.info(f"Auto-execution limit reached for conversation {conversation_id}")
+                    
+                    # Add message to conversation to ask user if they want to continue
+                    add_message_to_conversation(
+                        conversation_id,
+                        {
+                            "role": "system",
+                            "content": [{"type": "text", "text": "Automatic tool execution limit (10) reached. Please confirm if you want to continue with automatic execution by clicking the 'Continue' button."}]
+                        }
+                    )
+                    
+                    # Change status to paused
+                    set_task_status(conversation_id, "paused")
+                else:
+                    # Continue with automatic execution
+                    logger.info(f"Auto-execution count {current_count} is below limit, continuing processing")
+                    await process_tool_calls_and_continue(
+                        new_tool_calls, 
+                        conversation_id, 
+                        max_tokens, 
+                        thinking_mode, 
+                        thinking_budget_tokens,
+                        auto_execute_tools,
+                        client
+                    )
                 
         except Exception as e:
             logger.error(f"Error processing Claude response: {str(e)}")
