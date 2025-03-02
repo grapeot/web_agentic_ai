@@ -296,7 +296,7 @@ body {
 }
 
 .result-content {
-    padding: 1rem;
+    padding: 1rem 1rem 1rem 2rem;
     background-color: white;
     font-size: 0.95rem;
 }
@@ -314,6 +314,7 @@ body {
     align-items: center;
     gap: 0.5rem;
     color: var(--text-color);
+    padding-left: 1rem;
 }
 
 .status-line strong,
@@ -331,6 +332,7 @@ body {
     align-items: center;
     gap: 0.5rem;
     color: var(--text-color);
+    padding-left: 1rem;
 }
 
 .status-line.success {
@@ -339,7 +341,7 @@ body {
 
 .file-content {
     margin-top: 1rem;
-    padding: 1rem;
+    padding: 1rem 1rem 1rem 2rem;
     background-color: #f8fafc;
     border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
@@ -347,8 +349,10 @@ body {
 
 .file-content pre {
     margin: 0;
-    padding: 0;
+    padding: 0.5rem;
     background-color: transparent;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
 }
 
 .file-content code {
@@ -675,7 +679,7 @@ pre code {
 }
 
 .tool-content {
-    padding: 1rem;
+    padding: 1rem 1rem 1rem 2rem;
     border-bottom: 1px solid var(--border-color);
     background-color: white;
 }
@@ -687,7 +691,7 @@ pre code {
 .tool-section-label {
     font-weight: 600;
     color: var(--text-color);
-    padding: 8px 10px;
+    padding: 8px 10px 8px 20px;
     background-color: var(--bg-light);
     border-radius: var(--radius-sm);
     margin-bottom: 8px;
@@ -716,11 +720,17 @@ pre code {
     border-bottom-right-radius: 0;
 }
 
+.tool-output,
+.tool-error {
+    margin-left: 10px;
+}
+
 .tool-output .output-content,
 .tool-error .error-content {
     transition: all 0.3s ease;
     max-height: 500px;
     overflow-y: auto;
+    padding-left: 20px;
 }
 
 .list-group-item {
@@ -998,7 +1008,7 @@ pre code {
 /* Tool Generated Files */
 .tool-generated-files {
   margin: 15px 0;
-  padding: 10px;
+  padding: 10px 10px 10px 25px;
   border-radius: 8px;
   background-color: var(--card-bg);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -1009,6 +1019,7 @@ pre code {
   align-items: center;
   margin-bottom: 10px;
   padding-bottom: 8px;
+  padding-left: 10px;
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -1016,6 +1027,8 @@ pre code {
   margin: 0;
   font-size: 1rem;
   color: var(--primary-color);
+  display: flex;
+  align-items: center;
 }
 
 .tool-files-header h5 i {
