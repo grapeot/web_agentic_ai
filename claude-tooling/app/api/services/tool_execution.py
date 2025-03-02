@@ -143,17 +143,8 @@ async def process_tool_calls_and_continue(
                         if not (msg.get("is_status") and msg.get("id") == tool_start_id)
                     ]
                     
-                # Add completion message for this tool
-                add_message_to_conversation(
-                    conversation_id,
-                    {
-                        "role": "system",
-                        "content": [{"type": "text", "text": f"Tool {tool_call['name']} executed successfully"}],
-                        "id": f"tool_complete_{tool_call['id']}_{int(datetime.datetime.now().timestamp())}",
-                        "is_status": True,
-                        "is_temporary": True  # Mark as temporary so it can be cleaned up later
-                    }
-                )
+                # We don't need to add completion messages for each tool since they cause frontend duplication
+                # The final tool results will be added at the end of this function
                 
                 # Update progress
                 progress_pct = 25 + (25 * (i + 1) / len(tool_calls))
@@ -303,8 +294,26 @@ async def process_tool_calls_and_continue(
                                         skip_indices.add(i + 1)  # Mark as processed
                                         break
                         
+                        # Check for existing tool results in later messages
+                        has_result_elsewhere = False
+                        tool_use_ids = set()
+                        for content_item in msg.get("content", []):
+                            if content_item.get("type") == "tool_use":
+                                tool_use_ids.add(content_item.get("id"))
+                        
+                        # Check all user messages after this one for tool results matching these IDs
+                        for j in range(i+1, len(api_messages)):
+                            if api_messages[j].get("role") == "user":
+                                user_msg = api_messages[j]
+                                if isinstance(user_msg.get("content"), list):
+                                    for content_item in user_msg.get("content", []):
+                                        if (content_item.get("type") == "tool_result" and 
+                                            content_item.get("tool_use_id") in tool_use_ids):
+                                            has_result_elsewhere = True
+                                            break
+                        
                         # If no tool_result follows, add an empty tool_result response
-                        if not has_tool_result:
+                        if not has_tool_result and not has_result_elsewhere:
                             logger.warning(f"Tool use without corresponding tool result found at index {i}, adding placeholder")
                             tool_use_blocks = [item for item in msg.get("content", []) 
                                               if item.get("type") == "tool_use"]
@@ -312,11 +321,17 @@ async def process_tool_calls_and_continue(
                             # Create empty tool results for each tool_use
                             empty_results = []
                             for tool_use in tool_use_blocks:
-                                empty_results.append({
-                                    "type": "tool_result",
-                                    "tool_use_id": tool_use.get("id"),
-                                    "content": json.dumps({"status": "error", "message": "No result available"})
-                                })
+                                # Only add placeholder for tool uses that don't have results
+                                if not any(api_messages[j].get("role") == "user" and 
+                                          any(item.get("type") == "tool_result" and 
+                                              item.get("tool_use_id") == tool_use.get("id")
+                                              for item in api_messages[j].get("content", []))
+                                          for j in range(i+1, len(api_messages))):
+                                    empty_results.append({
+                                        "type": "tool_result",
+                                        "tool_use_id": tool_use.get("id"),
+                                        "content": json.dumps({"status": "processing", "message": "Processing tool execution..."})
+                                    })
                             
                             if empty_results:
                                 fixed_messages.append({
@@ -422,15 +437,30 @@ async def process_tool_calls_and_continue(
                 logger.info(f"Automatic execution of conversation {conversation_id} cancelled")
                 return
                 
-            # Extract new tool calls
+            # Extract new tool calls and filter out duplicates
+            existing_tool_call_ids = set()
+            for msg in conversations.get(conversation_id, []):
+                if msg.get("role") == "assistant" and isinstance(msg.get("content"), list):
+                    for item in msg.get("content", []):
+                        if item.get("type") == "tool_use" and item.get("id"):
+                            existing_tool_call_ids.add(item.get("id"))
+            
             new_tool_calls = []
             for item in content:
                 if item.get('type') == 'tool_use':
+                    # Skip already processed tool calls to prevent duplicates
+                    if item.get('id') in existing_tool_call_ids:
+                        logger.info(f"Skipping already processed tool call: {item.get('id')}")
+                        continue
+                    
                     new_tool_calls.append({
                         "id": item.get('id'),
                         "name": item.get('name'),
                         "input": item.get('input', {})
                     })
+                    
+                    # Add to existing IDs to prevent processing the same tool call multiple times
+                    existing_tool_call_ids.add(item.get('id'))
             
             # Update progress based on whether there are new tool calls
             if not new_tool_calls:

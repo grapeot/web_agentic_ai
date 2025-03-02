@@ -250,17 +250,27 @@ function updateChatWithNewMessages(newMessages) {
           }
         } else if (item.type === config.MESSAGE_TYPES.TOOL_USE) {
           // Check if it's a new tool call
+          // Skip processing if we've already seen this tool call
+          if (state.hasProcessedToolCall(item.id)) {
+            console.log(`Skipping already processed tool call: ${item.id}`);
+            continue;
+          }
+          
           if (lastHandledToolId === item.id) {
             foundLastHandled = true;
             continue; // Skip already handled tool call
           }
           
           if (foundLastHandled) {
+            console.log(`Processing new tool call: ${item.id} (${item.name})`);
             toolCalls.push({
               id: item.id,
               name: item.name,
               input: item.input
             });
+            
+            // Mark this tool call as processed
+            state.addProcessedToolCall(item.id);
             
             hasNewToolCalls = true;
             state.setLastToolCallId(item.id);
@@ -292,10 +302,19 @@ function updateChatWithNewMessages(newMessages) {
       // User message processing - find tool results
       for (const item of message.content) {
         if (item.type === config.MESSAGE_TYPES.TOOL_RESULT && item.tool_use_id) {
+          // Skip if we've already processed this tool result
+          if (state.hasProcessedToolResult(item.tool_use_id)) {
+            console.log(`Skipping already processed tool result for: ${item.tool_use_id}`);
+            continue;
+          }
+
           // Process the tool result to check for generated files
           const processedResult = processToolResult(item.content, item.tool_use_id);
           pendingToolResults.set(item.tool_use_id, processedResult);
           hasToolResults = true;
+          
+          // Mark this tool result as processed
+          state.addProcessedToolResult(item.tool_use_id);
           
           // Check if this is the result for the current tool use ID
           if (item.tool_use_id === state.getCurrentToolUseId()) {
