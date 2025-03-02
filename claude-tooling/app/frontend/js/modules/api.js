@@ -28,18 +28,18 @@ async function fetchAvailableTools() {
  * @returns {Promise<Object>} Chat response
  */
 async function sendMessage(messages, settings, conversationId = null) {
-  // Ensure messages is an array and contains at least one message
+  // Ensure messages is an array
   if (!Array.isArray(messages)) {
     messages = [];
   }
   
-  // Add the current message if messages array is empty
-  if (messages.length === 0) {
-    messages.push({
-      role: 'user',
-      content: 'Hello'
-    });
-  }
+  // Filter out any messages with empty content
+  messages = messages.filter(msg => {
+    if (!msg.content || !Array.isArray(msg.content)) return false;
+    return msg.content.some(block => block.type === 'text' && block.text.trim() !== '');
+  });
+  
+  console.log('Filtered messages:', messages);
   
   const requestBody = {
     messages,

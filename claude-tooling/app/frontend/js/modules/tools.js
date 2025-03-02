@@ -19,7 +19,7 @@ function processAssistantMessage(content) {
   }
   
   // Debug output to help diagnose issues
-  console.log('Processing assistant message content:', JSON.stringify(content));
+  console.log('Processing assistant message content:', JSON.stringify(content, null, 2));
   
   let textContent = '';
   let toolCalls = [];
@@ -34,7 +34,12 @@ function processAssistantMessage(content) {
   
   // Process message content
   content.forEach(item => {
-    if (item.type === config.MESSAGE_TYPES.TEXT) {
+    console.log('Processing content item:', item);
+    
+    if (item.type === 'thinking') {
+      console.log('Processing thinking content:', item.thinking);
+      ui.addThinkingToChat(item.thinking);
+    } else if (item.type === config.MESSAGE_TYPES.TEXT) {
       // For text messages, concatenate content with proper spacing
       if (textContent && item.text) {
         // Only add a space if needed to prevent words from running together
@@ -53,6 +58,7 @@ function processAssistantMessage(content) {
         textContent += JSON.stringify(item.text);
       }
     } else if (item.type === config.MESSAGE_TYPES.TOOL_USE && !displayedToolIds.has(item.id)) {
+      console.log('Found tool call:', item);
       // Tool call
       toolCalls.push({
         id: item.id,
@@ -77,6 +83,7 @@ function processAssistantMessage(content) {
   
   // Process text content to clean up line breaks before displaying
   if (textContent) {
+    console.log('Final text content:', textContent);
     // Clean up unnecessary consecutive line breaks
     textContent = utils.cleanLineBreaks(textContent);
     
@@ -92,13 +99,8 @@ function processAssistantMessage(content) {
   
   // Display tool calls
   toolCalls.forEach(toolCall => {
+    console.log('Displaying tool call:', toolCall);
     ui.addToolCallToChat(toolCall);
-    
-    // Start auto-execution if enabled
-    if (state.getSettings().autoExecuteTools && toolCall.id) {
-      console.log('Auto-executing tool call:', toolCall.name);
-      ui.setAutoExecutionIndicator(true);
-    }
   });
 }
 

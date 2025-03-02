@@ -150,146 +150,109 @@ function clearChat() {
 }
 
 /**
- * Add message to chat interface
- * @param {string} role - Message role
- * @param {string|Object} content - Message content
+ * Add message to chat
+ * @param {string} role - Message role (user/assistant)
+ * @param {string|Object|Array} content - Message content
  */
 function addMessageToChat(role, content) {
-  if (!elements.chatMessages) return;
-  
-  const messageDiv = document.createElement('div');
-  messageDiv.className = `message ${role}-message`;
-  
-  // Debug the content type
   console.log('Adding message type:', typeof content, role, content);
   
-  try {
-    let processedContent = '';
-    
-    // Object handling
-    if (content && typeof content === 'object') {
-      // Debug log for object content
-      console.log('Processing object content:', content);
-      
-      // Handle text property if present (direct access)
-      if (content.text && typeof content.text === 'string') {
-        console.log('Rendering text property:', content.text);
-        processedContent = content.text;
-      }
-      // Handle structured text object
-      else if (content.type === MESSAGE_TYPES.TEXT && typeof content.text === 'string') {
-        console.log('Rendering text content:', content.text);
-        processedContent = content.text;
-      } 
-      // Handle content property if present
-      else if (content.content && typeof content.content === 'string') {
-        console.log('Rendering content property:', content.content);
-        processedContent = content.content;
-      }
-      // Handle tool results with status and message
-      else if (content.status && content.message) {
-        console.log('Rendering tool result with status and message');
-        processedContent = `Status: ${content.status}\nMessage: ${content.message}`;
-        
-        // Add file path if available
-        if (content.file_path) {
-          processedContent += `\nFile path: ${content.file_path}`;
-        }
-      }
-      // Last resort: stringify the entire object
-      else {
-        console.log('Rendering stringified object');
-        try {
-          // Try to parse JSON first in case it's a stringified JSON
-          if (typeof content === 'string') {
-            const parsedContent = JSON.parse(content);
-            processedContent = JSON.stringify(parsedContent, null, 2);
-          } else {
-            processedContent = JSON.stringify(content, null, 2);
-          }
-        } catch (e) {
-          // If JSON parsing fails, use string representation
-          processedContent = String(content);
-        }
-      }
-    } 
-    // String handling
-    else if (typeof content === 'string') {
-      processedContent = content;
-    }
-    else {
-      // Fallback for null/undefined or other types
-      processedContent = '<em>(No content)</em>';
-    }
-    
-    // Check if content contains Markdown
-    const hasMarkdown = /[*_`#\[\]\\]/.test(processedContent);
-    
-    if (hasMarkdown) {
-      // Apply Markdown parsing with fallback for errors
-      try {
-        if (processedContent && processedContent.trim()) {
-          messageDiv.innerHTML = marked.parse(processedContent);
-        } else {
-          messageDiv.innerHTML = '<em>(Empty content)</em>';
-        }
-      } catch (markdownError) {
-        console.warn('Markdown parsing failed:', markdownError);
-        // Fallback to plain text with manual line break handling
-        messageDiv.textContent = processedContent;
-      }
-      
-      // Apply syntax highlighting to code blocks
-      messageDiv.querySelectorAll('pre code').forEach((block) => {
-        try {
-          hljs.highlightElement(block);
-        } catch (err) {
-          console.warn('Failed to highlight code block:', err);
-        }
-      });
-      
-      // Ensure image links display correctly
-      messageDiv.querySelectorAll('img').forEach(img => {
-        // Add loading events and error handling
-        img.onerror = () => {
-          console.error(`Failed to load image: ${img.src}`);
-          img.alt = 'Image failed to load';
-          img.classList.add('image-load-error');
-        };
-        
-        // Add click event for image zoom effect
-        img.onclick = () => {
-          img.classList.toggle('expanded');
-        };
-      });
-    } else {
-      // For plain text, use textContent and handle line breaks
-      messageDiv.textContent = processedContent;
-    }
-  } catch (error) {
-    console.error('Error rendering message content:', error);
-    // Emergency fallback - just display the string representation safely
-    messageDiv.textContent = String(content);
+  const messageDiv = document.createElement('div');
+  // Add correct role-specific class
+  messageDiv.classList.add('message');
+  if (role === config.ROLES.USER) {
+    messageDiv.classList.add('user-message');
+  } else if (role === config.ROLES.ASSISTANT) {
+    messageDiv.classList.add('assistant-message');
   }
   
-  elements.chatMessages.appendChild(messageDiv);
-  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+  // Extract the actual text content
+  let textContent = '';
+  if (typeof content === 'string') {
+    textContent = content;
+  } else if (content && typeof content === 'object') {
+    if (Array.isArray(content)) {
+      // Handle array of content blocks
+      textContent = content
+        .filter(block => block.type === 'text' && block.text)
+        .map(block => block.text)
+        .join('\n');
+    } else if (content.type === 'text' && content.text) {
+      textContent = content.text;
+    }
+  }
+  
+  if (!textContent) {
+    console.warn('No valid text content to display:', content);
+    return;
+  }
+  
+  // Parse the text content with marked
+  try {
+    messageDiv.innerHTML = marked(textContent);
+    
+    // Apply syntax highlighting to code blocks
+    messageDiv.querySelectorAll('pre code').forEach(block => {
+      if (window.hljs) {
+        try {
+          window.hljs.highlightElement(block);
+        } catch (e) {
+          console.error('Error highlighting code block:', e);
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error parsing markdown:', error);
+    messageDiv.textContent = textContent;
+  }
+  
+  // Only append if we have content
+  if (messageDiv.innerHTML) {
+    const chatMessages = document.getElementById('chat-messages');
+    if (chatMessages) {
+      chatMessages.appendChild(messageDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+  }
 }
 
 /**
- * Add thinking content to chat interface
- * @param {string} thinking - Thinking content
+ * Add thinking content to chat
+ * @param {string} content - Thinking content
  */
-function addThinkingToChat(thinking) {
-  if (!elements.chatMessages) return;
+function addThinkingToChat(content) {
+  if (!content) return;
   
   const thinkingDiv = document.createElement('div');
-  thinkingDiv.className = `message ${ROLES.THINKING}-message`;
-  thinkingDiv.innerHTML = `<div class="thinking-label">Thinking Process:</div>
-                          <pre class="thinking-content">${escapeHtml(thinking)}</pre>`;
+  thinkingDiv.classList.add('thinking-section', 'collapsible');
   
-  elements.chatMessages.appendChild(thinkingDiv);
-  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+  // Add toggle button
+  const toggleBtn = document.createElement('button');
+  toggleBtn.classList.add('thinking-toggle');
+  toggleBtn.textContent = config.TOOL_DISPLAY.EXPAND;
+  toggleBtn.onclick = () => {
+    thinkingDiv.classList.toggle('collapsed');
+    toggleBtn.textContent = thinkingDiv.classList.contains('collapsed') 
+      ? config.TOOL_DISPLAY.EXPAND 
+      : config.TOOL_DISPLAY.COLLAPSE;
+  };
+  
+  // Add thinking content
+  const contentDiv = document.createElement('div');
+  contentDiv.classList.add('thinking-content');
+  contentDiv.innerHTML = marked.parse(content);
+  
+  thinkingDiv.appendChild(toggleBtn);
+  thinkingDiv.appendChild(contentDiv);
+  
+  const chatMessages = document.getElementById('chat-messages');
+  if (chatMessages) {
+    chatMessages.appendChild(thinkingDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+  
+  // Start collapsed
+  thinkingDiv.classList.add('collapsed');
 }
 
 /**
@@ -631,11 +594,10 @@ function appendFileContent(container, toolCallDiv, result) {
       const languageMap = {
         py: 'python',
         js: 'javascript',
-        ts: 'javascript',
+        ts: 'typescript',
         jsx: 'javascript',
-        tsx: 'javascript',
+        tsx: 'typescript',
         html: 'html',
-        htm: 'html',
         css: 'css'
       };
       code.className = `language-${languageMap[extension] || extension}`;
@@ -675,29 +637,49 @@ function setupToolCallToggle(toolCallDiv) {
 }
 
 /**
+ * Show error message
+ * @param {string} message - Error message to display
+ */
+function showError(message) {
+  const errorDiv = document.createElement('div');
+  errorDiv.className = 'message system-message error';
+  errorDiv.textContent = message;
+  
+  const chatMessages = document.getElementById('chat-messages');
+  if (chatMessages) {
+    chatMessages.appendChild(errorDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+  
+  console.error('UI Error:', message);
+}
+
+/**
  * Render available tools
  * @param {Array} tools - Array of tool objects
  */
 function renderTools(tools) {
-    const toolsList = elements.toolsGroup;
-    toolsList.innerHTML = '';
+  const toolsList = elements.toolsGroup;
+  if (!toolsList) return;
+  
+  toolsList.innerHTML = '';
+  
+  tools.forEach(tool => {
+    const li = document.createElement('li');
+    li.className = 'tool-item';
     
-    tools.forEach(tool => {
-        const li = document.createElement('li');
-        li.className = 'tool-item';
-        
-        const nameElement = document.createElement('div');
-        nameElement.className = 'tool-name';
-        nameElement.textContent = tool.name;
-        
-        const descriptionElement = document.createElement('div');
-        descriptionElement.className = 'tool-description';
-        descriptionElement.textContent = tool.description || 'No description';
-        
-        li.appendChild(nameElement);
-        li.appendChild(descriptionElement);
-        toolsList.appendChild(li);
-    });
+    const nameElement = document.createElement('div');
+    nameElement.className = 'tool-name';
+    nameElement.textContent = tool.name;
+    
+    const descriptionElement = document.createElement('div');
+    descriptionElement.className = 'tool-description';
+    descriptionElement.textContent = tool.description || 'No description';
+    
+    li.appendChild(nameElement);
+    li.appendChild(descriptionElement);
+    toolsList.appendChild(li);
+  });
 }
 
 /**
@@ -730,7 +712,6 @@ function fetchAndDisplayMarkdown(url, container) {
     .then(markdown => {
       try {
         container.innerHTML = marked.parse(markdown);
-        // Apply syntax highlighting to code blocks
         container.querySelectorAll('pre code').forEach(block => {
           hljs.highlightElement(block);
         });
@@ -755,7 +736,6 @@ function displayHtmlPreview(url, container) {
     .then(response => response.text())
     .then(html => {
       try {
-        // Create a sandbox iframe
         const iframe = document.createElement('iframe');
         iframe.style.width = '100%';
         iframe.style.height = '400px';
@@ -763,7 +743,6 @@ function displayHtmlPreview(url, container) {
         container.innerHTML = '';
         container.appendChild(iframe);
         
-        // Write the HTML to the iframe
         const doc = iframe.contentWindow.document;
         doc.open();
         doc.write(html);
@@ -779,27 +758,6 @@ function displayHtmlPreview(url, container) {
     });
 }
 
-/**
- * Show error message
- * @param {string} message - Error message to display
- */
-function showError(message) {
-  // Create error message element
-  const errorDiv = document.createElement('div');
-  errorDiv.className = 'message system-message error';
-  errorDiv.textContent = message;
-  
-  // Add to chat
-  if (elements.chatMessages) {
-    elements.chatMessages.appendChild(errorDiv);
-    elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-  }
-  
-  // Log error
-  console.error('UI Error:', message);
-}
-
-// ES module export
 export {
   initializeUI,
   getElements,
@@ -819,4 +777,4 @@ export {
   escapeHtml,
   setupToolCallToggle,
   showError
-}; 
+};

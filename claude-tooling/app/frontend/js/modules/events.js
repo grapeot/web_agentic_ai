@@ -79,7 +79,16 @@ async function handleChatSubmit(event) {
   if (!message) return;
   
   try {
-    // Clear input and disable form
+    // Add user message to state and chat
+    const userMessage = {
+      role: config.ROLES.USER,
+      content: [{
+        type: config.MESSAGE_TYPES.TEXT,
+        text: message
+      }]
+    };
+    
+    // Clear input and disable form before adding message to state
     messageInput.value = '';
     messageInput.disabled = true;
     const submitButton = document.getElementById('send-button');
@@ -87,29 +96,57 @@ async function handleChatSubmit(event) {
       submitButton.disabled = true;
     }
     
-    // Add user message to chat
-    ui.addMessageToChat(config.ROLES.USER, message);
-    
     // Show loading indicator
     ui.setLoading(true);
     
+    // Add message to state and UI
+    state.addMessage(userMessage);
+    ui.addMessageToChat(config.ROLES.USER, message);
+    
+    // Get current messages from state (this ensures we have the latest state)
+    const currentMessages = state.getMessages();
+    console.log('Current messages before API call:', currentMessages);
+    
     // Send message to API
     const response = await api.sendMessage(
-      state.getMessages(),
+      currentMessages,
       state.getSettings(),
       state.getConversationId()
     );
     
+    console.log('Received API response:', response);
+    
     // Update conversation ID if needed
     if (response.conversation_id) {
       state.setConversationId(response.conversation_id);
+      console.log('Conversation ID set:', response.conversation_id);
     }
     
     // Process assistant message
-    if (response.messages && response.messages.length > 0) {
-      const lastMessage = response.messages[response.messages.length - 1];
-      if (lastMessage.role === config.ROLES.ASSISTANT && lastMessage.content) {
-        tools.processAssistantMessage(lastMessage.content);
+    if (response.message) {
+      console.log('Processing message:', response.message);
+      if (response.message.role === config.ROLES.ASSISTANT) {
+        console.log('Processing assistant message:', response.message);
+        if (response.message.content) {
+          ui.addMessageToChat(config.ROLES.ASSISTANT, response.message.content);
+          if (Array.isArray(response.message.content)) {
+            tools.processAssistantMessage(response.message.content);
+          }
+        }
+      }
+    }
+    
+    // Process thinking content if present
+    if (response.thinking) {
+      console.log('Processing thinking content:', response.thinking);
+      ui.addThinkingToChat(response.thinking);
+    }
+    
+    // Process tool calls if present
+    if (response.tool_calls && response.tool_calls.length > 0) {
+      console.log('Processing tool calls:', response.tool_calls);
+      for (const toolCall of response.tool_calls) {
+        ui.addToolCallToChat(toolCall);
       }
     }
   } catch (error) {

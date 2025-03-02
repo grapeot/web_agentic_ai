@@ -160,24 +160,23 @@
     <!-- Configure Marked library -->
     <script>
         // Configure Marked to handle line breaks properly
-        // Create custom renderer to handle paragraphs and line breaks better
         const renderer = new marked.Renderer();
         
         // Customize paragraph rendering to better handle line breaks
         renderer.paragraph = function(text) {
-            // Preserve consecutive breaks that might be in the text
-            return '<p>' + text + '</p>';
+            return text;  // Don't wrap in <p> tags
         };
         
         // Configure Marked with our custom settings
         marked.setOptions({
             renderer: renderer,      // Use our custom renderer
             breaks: true,            // Convert line breaks to <br>
-            gfm: true,               // Use GitHub flavored markdown
+            gfm: true,              // Use GitHub flavored markdown
             headerIds: false,        // Don't add IDs to headers
-            mangle: false,           // Don't mangle email links
-            smartLists: true,        // Use smarter list behavior
-            xhtml: true              // Use self-closing tags for XHTML compatibility
+            mangle: false,          // Don't mangle email links
+            smartLists: true,       // Use smarter list behavior
+            xhtml: true,            // Use self-closing tags for XHTML compatibility
+            silent: true            // Don't throw errors on invalid markdown
         });
     </script>
     <!-- Highlight.js for syntax highlighting -->
