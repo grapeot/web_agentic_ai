@@ -125,13 +125,24 @@ function startPollingForUpdates() {
         updateChatWithNewMessages(updates.messages);
       }
       
-      // Check if completed
-      if (updates.completed) {
-        console.log('Conversation completed, stopping polling');
+      // Check detailed status
+      if (updates.status === "completed" || updates.status === "error") {
+        console.log(`Conversation ${updates.status}, stopping polling`);
         clearInterval(intervalId);
         state.setPollingInterval(null);
         state.setAutoExecutingTools(false);
         ui.setAutoExecutionIndicator(false);
+      } else if (updates.status === "in_progress" || 
+                updates.status === "executing_tool" || 
+                updates.status === "waiting_for_claude") {
+        // Update UI to reflect ongoing work
+        ui.setAutoExecutionIndicator(true, updates.status);
+      }
+      
+      // Update UI with progress information if available
+      if (updates.progress) {
+        console.log('Progress information:', updates.progress);
+        ui.updateProgressIndicator(updates.progress);
       }
     } catch (error) {
       console.error('Error polling for updates:', error);

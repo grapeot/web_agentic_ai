@@ -49,18 +49,27 @@ async def get_conversation_messages(conversation_id: str):
         # Get conversation history
         history = get_conversation(conversation_id)
         
+        # Get detailed progress information
+        from ..services.conversation import get_request_progress
+        progress_info = await get_request_progress(conversation_id)
+        
         # Check conversation status from auto_execute_tasks first
         task_status = get_task_status(conversation_id)
         
         if task_status == "paused":
             # Tool execution is paused (hit the limit)
             status = "paused"
+        elif task_status in ["waiting_for_claude", "executing_tool", "running"]:
+            # We have a more detailed status from progress tracking
+            status = task_status
         else:
             # Check messages to determine status
-            # Find the last message, if it's assistant message and no tool calls, then consider conversation completed
+            # Find the last real message (excluding placeholders and status messages)
             status = "in_progress"
-            if history and len(history) > 0:
-                last_message = history[-1]
+            real_messages = [m for m in history if not m.get("is_placeholder") and not m.get("is_status")]
+            
+            if real_messages and len(real_messages) > 0:
+                last_message = real_messages[-1]
                 if last_message["role"] == "assistant":
                     # Check if there are tool calls
                     has_tool_call = False
@@ -75,11 +84,17 @@ async def get_conversation_messages(conversation_id: str):
         # Get the conversation root directory if available
         root_dir = get_root_dir(conversation_id)
         
+        # Filter out placeholder and temporary messages for UI display
+        display_history = history
+        if any(msg.get("is_placeholder") or msg.get("is_temporary") for msg in history):
+            display_history = [msg for msg in history if not msg.get("is_placeholder") and not msg.get("is_temporary")]
+        
         return {
             "conversation_id": conversation_id,
-            "messages": history,
+            "messages": display_history,
             "status": status,
-            "root_dir": root_dir
+            "root_dir": root_dir,
+            "progress": progress_info
         }
         
     except Exception as e:
@@ -156,9 +171,18 @@ async def resume_auto_execution(
         if status != "paused":
             raise HTTPException(status_code=400, detail=f"Cannot resume execution, status is {status}")
         
+        # Update progress status
+        from ..services.conversation import update_progress
+        await update_progress(
+            conversation_id,
+            "resuming",
+            "resuming_execution",
+            "Resuming automatic tool execution...",
+            85
+        )
+        
         # Reset the counter and set status back to running
         reset_auto_execute_count(conversation_id)
-        set_task_status(conversation_id, "running")
         
         # Add system message to conversation history
         from ..services.conversation import add_message_to_conversation as add_msg
