@@ -1,170 +1,211 @@
 /**
- * 状态管理模块 - 管理应用状态
+ * State Management Module
+ * Manages application state using a singleton pattern
  */
 import * as config from './config.js';
 
 /**
- * 应用状态管理类
- * 管理聊天状态、消息历史、设置和工具状态
+ * Application State Manager Class
+ * Manages chat state, message history, settings and tool state
  */
 class StateManager {
   constructor() {
-    // 初始化状态
+    // Initialize state
     this.reset();
   }
   
   /**
-   * 重置所有状态
+   * Reset all state to initial values
    */
   reset() {
-    // 对话状态
+    // Conversation state
     this.conversationId = null;
     this.messages = [];
     
-    // 工具状态
+    // Tool state
     this.currentToolUseId = null;
     this.waitingForToolResult = false;
     this.autoExecutingTools = false;
     this.pollingInterval = null;
     this.lastToolCallId = null;
     
-    // 设置
+    // Settings
     this.settings = { ...config.DEFAULT_SETTINGS };
+    
+    // Message tracking for duplicate prevention
+    this.processedMessageIds = new Set();
+    this.processedTextContent = new Set();
   }
   
   /**
-   * 更新设置
-   * @param {string} key - 设置名称
-   * @param {any} value - 设置值
+   * Update a setting value
+   * @param {string} key - Setting name
+   * @param {any} value - Setting value
    */
   updateSetting(key, value) {
     if (key in this.settings) {
       this.settings[key] = value;
+      console.log(`Setting updated: ${key} = ${value}`);
     }
   }
   
   /**
-   * 获取当前设置
-   * @returns {Object} 当前设置
+   * Get current settings
+   * @returns {Object} Current settings object
    */
   getSettings() {
     return { ...this.settings };
   }
   
   /**
-   * 添加消息到历史
-   * @param {Object} message - 消息对象
+   * Add message to history
+   * @param {Object} message - Message object
    */
   addMessage(message) {
+    if (message.id) {
+      this.processedMessageIds.add(message.id);
+    }
     this.messages.push(message);
   }
   
   /**
-   * 获取消息历史
-   * @returns {Array} 消息历史
+   * Get message history
+   * @returns {Array} Message history array
    */
   getMessages() {
     return [...this.messages];
   }
   
   /**
-   * 设置对话ID
-   * @param {string} id - 对话ID
+   * Set conversation ID
+   * @param {string} id - Conversation ID
    */
   setConversationId(id) {
     this.conversationId = id;
+    console.log(`Conversation ID set: ${id}`);
   }
   
   /**
-   * 获取对话ID
-   * @returns {string|null} 对话ID或null
+   * Get conversation ID
+   * @returns {string|null} Conversation ID or null
    */
   getConversationId() {
     return this.conversationId;
   }
   
   /**
-   * 设置当前工具使用ID
-   * @param {string} id - 工具使用ID
+   * Set current tool use ID
+   * @param {string} id - Tool use ID
    */
   setCurrentToolUseId(id) {
     this.currentToolUseId = id;
+    console.log(`Current tool use ID set: ${id}`);
   }
   
   /**
-   * 获取当前工具使用ID
-   * @returns {string|null} 工具使用ID或null
+   * Get current tool use ID
+   * @returns {string|null} Tool use ID or null
    */
   getCurrentToolUseId() {
     return this.currentToolUseId;
   }
   
   /**
-   * 设置工具结果等待状态
-   * @param {boolean} waiting - 是否等待工具结果
+   * Set tool result waiting state
+   * @param {boolean} waiting - Whether waiting for tool result
    */
   setWaitingForToolResult(waiting) {
     this.waitingForToolResult = waiting;
+    console.log(`Waiting for tool result: ${waiting}`);
   }
   
   /**
-   * 获取工具结果等待状态
-   * @returns {boolean} 是否在等待工具结果
+   * Check if waiting for tool result
+   * @returns {boolean} Whether waiting for tool result
    */
   isWaitingForToolResult() {
     return this.waitingForToolResult;
   }
   
   /**
-   * 设置自动执行工具状态
-   * @param {boolean} auto - 是否自动执行工具
+   * Set auto executing tools state
+   * @param {boolean} auto - Whether auto executing tools
    */
   setAutoExecutingTools(auto) {
     this.autoExecutingTools = auto;
+    console.log(`Auto executing tools: ${auto}`);
   }
   
   /**
-   * 获取自动执行工具状态
-   * @returns {boolean} 是否自动执行工具
+   * Check if auto executing tools
+   * @returns {boolean} Whether auto executing tools
    */
   isAutoExecutingTools() {
     return this.autoExecutingTools;
   }
   
   /**
-   * 设置轮询间隔ID
-   * @param {number|null} intervalId - 轮询间隔ID
+   * Set polling interval ID
+   * @param {number|null} intervalId - Polling interval ID
    */
   setPollingInterval(intervalId) {
     this.pollingInterval = intervalId;
+    console.log(`Polling interval ID set: ${intervalId}`);
   }
   
   /**
-   * 获取轮询间隔ID
-   * @returns {number|null} 轮询间隔ID
+   * Get polling interval ID
+   * @returns {number|null} Polling interval ID
    */
   getPollingInterval() {
     return this.pollingInterval;
   }
   
   /**
-   * 设置最后工具调用ID
-   * @param {string} id - 工具调用ID
+   * Set last tool call ID
+   * @param {string} id - Tool call ID
    */
   setLastToolCallId(id) {
     this.lastToolCallId = id;
+    console.log(`Last tool call ID set: ${id}`);
   }
   
   /**
-   * 获取最后工具调用ID
-   * @returns {string|null} 工具调用ID
+   * Get last tool call ID
+   * @returns {string|null} Tool call ID
    */
   getLastToolCallId() {
     return this.lastToolCallId;
   }
+  
+  /**
+   * Check if message ID has been processed
+   * @param {string} messageId - Message ID to check
+   * @returns {boolean} Whether message has been processed
+   */
+  hasProcessedMessage(messageId) {
+    return this.processedMessageIds.has(messageId);
+  }
+  
+  /**
+   * Check if text content has been processed
+   * @param {string} content - Text content to check
+   * @returns {boolean} Whether content has been processed
+   */
+  hasProcessedContent(content) {
+    return this.processedTextContent.has(content);
+  }
+  
+  /**
+   * Add processed text content
+   * @param {string} content - Text content to mark as processed
+   */
+  addProcessedContent(content) {
+    this.processedTextContent.add(content);
+  }
 }
 
-// 创建并导出状态管理实例
+// Create and export singleton instance
 const state = new StateManager();
 
 export { state }; 

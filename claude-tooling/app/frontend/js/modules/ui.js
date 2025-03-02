@@ -1,5 +1,5 @@
 /**
- * UI 模块 - 处理DOM操作和界面渲染
+ * UI Module - Handles DOM operations and interface rendering
  */
 import * as config from './config.js';
 import { state } from './state.js';
@@ -8,8 +8,8 @@ const TOOL_DISPLAY = config.TOOL_DISPLAY;
 const MESSAGE_TYPES = config.MESSAGE_TYPES;
 
 /**
- * DOM元素缓存
- * 在初始化时填充，避免重复查询DOM
+ * DOM element cache
+ * Populated during initialization to avoid repeated DOM queries
  */
 const elements = {
   chatMessages: null,
@@ -35,10 +35,10 @@ const elements = {
 };
 
 /**
- * 初始化UI元素引用
+ * Initialize UI element references
  */
 function initializeUI() {
-  // 缓存DOM元素
+  // Cache DOM elements
   elements.chatMessages = document.getElementById('chat-messages');
   elements.userInput = document.getElementById('user-input');
   elements.sendButton = document.getElementById('send-button');
@@ -62,16 +62,16 @@ function initializeUI() {
 }
 
 /**
- * 获取UI元素
- * @returns {Object} UI元素引用
+ * Get UI elements
+ * @returns {Object} UI element references
  */
 function getElements() {
   return elements;
 }
 
 /**
- * 显示加载状态
- * @param {boolean} isLoading - 是否显示加载状态
+ * Set loading state
+ * @param {boolean} isLoading - Whether to show loading state
  */
 function setLoading(isLoading) {
   if (elements.responseSpinner) {
@@ -83,8 +83,8 @@ function setLoading(isLoading) {
 }
 
 /**
- * 设置工具加载状态
- * @param {boolean} isLoading - 是否显示工具加载状态
+ * Set tools loading state
+ * @param {boolean} isLoading - Whether to show tools loading state
  */
 function setToolsLoading(isLoading) {
   if (elements.toolsSpinner) {
@@ -117,7 +117,7 @@ function setAutoExecutionIndicator(visible) {
 }
 
 /**
- * 显示工具结果模态框
+ * Show tool result modal
  */
 function showToolResultModal() {
   if (elements.toolResultModal) {
@@ -126,7 +126,7 @@ function showToolResultModal() {
 }
 
 /**
- * 隐藏工具结果模态框
+ * Hide tool result modal
  */
 function hideToolResultModal() {
   if (elements.toolResultModal) {
@@ -138,7 +138,7 @@ function hideToolResultModal() {
 }
 
 /**
- * 清空聊天界面
+ * Clear chat interface
  */
 function clearChat() {
   if (elements.chatMessages) {
@@ -150,9 +150,9 @@ function clearChat() {
 }
 
 /**
- * 添加消息到聊天界面
- * @param {string} role - 消息角色
- * @param {string} content - 消息内容
+ * Add message to chat interface
+ * @param {string} role - Message role
+ * @param {string|Object} content - Message content
  */
 function addMessageToChat(role, content) {
   if (!elements.chatMessages) return;
@@ -160,42 +160,116 @@ function addMessageToChat(role, content) {
   const messageDiv = document.createElement('div');
   messageDiv.className = `message ${role}-message`;
   
-  // 根据消息类型处理内容
-  if (typeof content === 'string') {
-    // 转换Markdown为HTML
-    messageDiv.innerHTML = marked.parse(content);
+  // Debug the content type
+  console.log('Adding message type:', typeof content, role, content);
+  
+  try {
+    let processedContent = '';
     
-    // 处理代码块语法高亮
-    messageDiv.querySelectorAll('pre code').forEach((block) => {
-      hljs.highlightElement(block);
-    });
-    
-    // 确保图片链接正确显示
-    messageDiv.querySelectorAll('img').forEach(img => {
-      // 添加加载事件和错误处理
-      img.onerror = () => {
-        console.error(`Failed to load image: ${img.src}`);
-        img.alt = 'Image failed to load';
-        img.classList.add('image-load-error');
-      };
+    // Object handling
+    if (content && typeof content === 'object') {
+      // Debug log for object content
+      console.log('Processing object content:', content);
       
-      // 为图片添加点击事件，实现点击放大效果
-      img.onclick = () => {
-        if (img.classList.contains('expanded')) {
-          img.classList.remove('expanded');
-        } else {
-          img.classList.add('expanded');
+      // Handle text property if present (direct access)
+      if (content.text && typeof content.text === 'string') {
+        console.log('Rendering text property:', content.text);
+        processedContent = content.text;
+      }
+      // Handle structured text object
+      else if (content.type === MESSAGE_TYPES.TEXT && typeof content.text === 'string') {
+        console.log('Rendering text content:', content.text);
+        processedContent = content.text;
+      } 
+      // Handle content property if present
+      else if (content.content && typeof content.content === 'string') {
+        console.log('Rendering content property:', content.content);
+        processedContent = content.content;
+      }
+      // Handle tool results with status and message
+      else if (content.status && content.message) {
+        console.log('Rendering tool result with status and message');
+        processedContent = `Status: ${content.status}\nMessage: ${content.message}`;
+        
+        // Add file path if available
+        if (content.file_path) {
+          processedContent += `\nFile path: ${content.file_path}`;
         }
-      };
-    });
-  } else if (content.type === MESSAGE_TYPES.TEXT) {
-    // 结构化文本消息，同样处理为Markdown
-    messageDiv.innerHTML = marked.parse(content.text);
+      }
+      // Last resort: stringify the entire object
+      else {
+        console.log('Rendering stringified object');
+        try {
+          // Try to parse JSON first in case it's a stringified JSON
+          if (typeof content === 'string') {
+            const parsedContent = JSON.parse(content);
+            processedContent = JSON.stringify(parsedContent, null, 2);
+          } else {
+            processedContent = JSON.stringify(content, null, 2);
+          }
+        } catch (e) {
+          // If JSON parsing fails, use string representation
+          processedContent = String(content);
+        }
+      }
+    } 
+    // String handling
+    else if (typeof content === 'string') {
+      processedContent = content;
+    }
+    else {
+      // Fallback for null/undefined or other types
+      processedContent = '<em>(No content)</em>';
+    }
     
-    // 处理代码块语法高亮
-    messageDiv.querySelectorAll('pre code').forEach((block) => {
-      hljs.highlightElement(block);
-    });
+    // Check if content contains Markdown
+    const hasMarkdown = /[*_`#\[\]\\]/.test(processedContent);
+    
+    if (hasMarkdown) {
+      // Apply Markdown parsing with fallback for errors
+      try {
+        if (processedContent && processedContent.trim()) {
+          messageDiv.innerHTML = marked.parse(processedContent);
+        } else {
+          messageDiv.innerHTML = '<em>(Empty content)</em>';
+        }
+      } catch (markdownError) {
+        console.warn('Markdown parsing failed:', markdownError);
+        // Fallback to plain text with manual line break handling
+        messageDiv.textContent = processedContent;
+      }
+      
+      // Apply syntax highlighting to code blocks
+      messageDiv.querySelectorAll('pre code').forEach((block) => {
+        try {
+          hljs.highlightElement(block);
+        } catch (err) {
+          console.warn('Failed to highlight code block:', err);
+        }
+      });
+      
+      // Ensure image links display correctly
+      messageDiv.querySelectorAll('img').forEach(img => {
+        // Add loading events and error handling
+        img.onerror = () => {
+          console.error(`Failed to load image: ${img.src}`);
+          img.alt = 'Image failed to load';
+          img.classList.add('image-load-error');
+        };
+        
+        // Add click event for image zoom effect
+        img.onclick = () => {
+          img.classList.toggle('expanded');
+        };
+      });
+    } else {
+      // For plain text, use textContent and handle line breaks
+      messageDiv.textContent = processedContent;
+    }
+  } catch (error) {
+    console.error('Error rendering message content:', error);
+    // Emergency fallback - just display the string representation safely
+    messageDiv.textContent = String(content);
   }
   
   elements.chatMessages.appendChild(messageDiv);
@@ -203,15 +277,15 @@ function addMessageToChat(role, content) {
 }
 
 /**
- * 添加思考内容到聊天界面
- * @param {string} thinking - 思考内容
+ * Add thinking content to chat interface
+ * @param {string} thinking - Thinking content
  */
 function addThinkingToChat(thinking) {
   if (!elements.chatMessages) return;
   
   const thinkingDiv = document.createElement('div');
   thinkingDiv.className = `message ${ROLES.THINKING}-message`;
-  thinkingDiv.innerHTML = `<div class="thinking-label">思考过程:</div>
+  thinkingDiv.innerHTML = `<div class="thinking-label">Thinking Process:</div>
                           <pre class="thinking-content">${escapeHtml(thinking)}</pre>`;
   
   elements.chatMessages.appendChild(thinkingDiv);
@@ -300,6 +374,125 @@ function addToolCallToChat(toolCall) {
 }
 
 /**
+ * Process and format file result for display
+ * @param {Object} result - File result object
+ * @param {boolean} isMultiple - Whether processing multiple files
+ * @returns {string} Formatted HTML
+ */
+function processFileResults(result, isMultiple = false) {
+  if (isMultiple && Array.isArray(result.files)) {
+    // Multiple files display
+    let filesHtml = `
+      <div class="generated-files">
+        <h4>Generated Files (${result.files.length})</h4>
+        <ul class="files-list">
+    `;
+    
+    result.files.forEach(file => {
+      filesHtml += generateFileListItem(file);
+    });
+    
+    filesHtml += `
+        </ul>
+        <div class="files-details-toggle">Details ${TOOL_DISPLAY.EXPAND_ARROW}</div>
+        <div class="files-details" style="display:none;">
+          <pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>
+        </div>
+      </div>
+    `;
+    
+    return filesHtml;
+  } else {
+    // Single file display
+    const file = isMultiple ? result.files[0] : result;
+    return `
+      <div class="file-result">
+        <h4>${escapeHtml(file.name || 'Generated File')}</h4>
+        ${generateFilePreview(file)}
+        ${generateFileActions(file)}
+        <div class="file-details-toggle">Details ${TOOL_DISPLAY.EXPAND_ARROW}</div>
+        <div class="file-details" style="display:none;">
+          <pre>${escapeHtml(JSON.stringify(file, null, 2))}</pre>
+        </div>
+      </div>
+    `;
+  }
+}
+
+/**
+ * Generate preview section for a file
+ * @param {Object} file - File object
+ * @returns {string} Preview HTML
+ */
+function generateFilePreview(file) {
+  const isImage = file.mime_type && file.mime_type.startsWith('image/');
+  const isMarkdown = file.name && file.name.endsWith('.md');
+  const isHtml = file.name && (file.name.endsWith('.html') || file.name.endsWith('.htm'));
+  
+  if (isImage && file.url) {
+    return `<img src="${file.url}" alt="${escapeHtml(file.name)}" class="file-preview" />`;
+  } else if (isMarkdown && file.url) {
+    return `
+      <div class="markdown-actions">
+        <button class="view-markdown-btn" data-url="${file.url}">View Markdown</button>
+      </div>
+      <div class="markdown-preview" style="display:none;"></div>
+    `;
+  } else if (isHtml && file.url) {
+    return `
+      <div class="html-actions">
+        <button class="view-html-btn" data-url="${file.url}">View HTML</button>
+        <a href="${file.url}" target="_blank" class="open-html-link">Open in new tab</a>
+      </div>
+      <div class="html-preview" style="display:none;"></div>
+    `;
+  }
+  return '';
+}
+
+/**
+ * Generate actions section for a file
+ * @param {Object} file - File object
+ * @returns {string} Actions HTML
+ */
+function generateFileActions(file) {
+  if (!file.url) return '';
+  
+  return `
+    <div class="file-actions">
+      <a href="${file.url}" download="${file.name}" class="download-link">Download File</a>
+    </div>
+  `;
+}
+
+/**
+ * Generate list item for a file in multiple files view
+ * @param {Object} file - File object
+ * @returns {string} List item HTML
+ */
+function generateFileListItem(file) {
+  const isMarkdown = file.name && file.name.endsWith('.md');
+  const isHtml = file.name && (file.name.endsWith('.html') || file.name.endsWith('.htm'));
+  
+  let actionsHtml = '';
+  if (isMarkdown && file.url) {
+    actionsHtml += `<button class="view-markdown-btn" data-url="${file.url}">View</button>`;
+  } else if (isHtml && file.url) {
+    actionsHtml += `<button class="view-html-btn" data-url="${file.url}">View</button>`;
+  }
+  if (file.url) {
+    actionsHtml += `<a href="${file.url}" download="${file.name}" class="download-link">Download</a>`;
+  }
+  
+  return `
+    <li class="file-item">
+      <span class="file-name">${escapeHtml(file.name || 'Unnamed File')}</span>
+      <div class="file-actions">${actionsHtml}</div>
+    </li>
+  `;
+}
+
+/**
  * Add tool result to chat
  * @param {Object|string} result - Result object or string
  * @param {string} toolUseId - Tool use ID
@@ -307,337 +500,160 @@ function addToolCallToChat(toolCall) {
 function addToolResultToChat(result, toolUseId) {
   if (!elements.chatMessages) return;
   
-  // 查找对应的工具调用
-  const toolCallDiv = document.querySelector(`.tool-call[data-tool-use-id="${toolUseId}"]`);
-  if (!toolCallDiv) return;
+  console.log('Adding tool result:', typeof result, result, 'for tool ID:', toolUseId);
   
-  // Check if result already exists to prevent duplication
-  if (toolCallDiv.querySelector('.tool-result')) {
-    console.log(`Result for tool ${toolUseId} already displayed, skipping duplicate`);
+  const toolCallDiv = document.querySelector(`.tool-call[data-tool-use-id="${toolUseId}"]`);
+  if (!toolCallDiv || toolCallDiv.querySelector('.tool-result')) {
+    console.warn(`Tool call not found or result already displayed for ${toolUseId}`);
     return;
   }
   
-  // 查找状态标签
-  const statusLabel = toolCallDiv.querySelector('.tool-status');
-  if (statusLabel) {
-    statusLabel.textContent = '已完成';
-    statusLabel.classList.add('completed');
-  }
-  
-  // 禁用执行按钮
-  const executeButton = toolCallDiv.querySelector('.execute-tool-button');
-  if (executeButton) {
-    executeButton.disabled = true;
-  }
-  
-  // 创建工具结果容器
   const resultDiv = document.createElement('div');
   resultDiv.className = 'tool-result';
   
-  // 处理不同类型的结果
+  // Create header
+  const headerDiv = document.createElement('div');
+  headerDiv.className = 'result-header';
+  headerDiv.innerHTML = `
+    <span class="result-toggle">${TOOL_DISPLAY.EXPAND_ARROW}</span>
+    <strong>Tool Result</strong>
+  `;
+  resultDiv.appendChild(headerDiv);
+  
+  // Create content container
+  const contentDiv = document.createElement('div');
+  contentDiv.className = 'result-content';
+  contentDiv.style.display = 'none';
+  resultDiv.appendChild(contentDiv);
+  
   try {
-    // 尝试解析JSON结果
+    // Parse result if needed
     const parsedResult = typeof result === 'string' ? JSON.parse(result) : result;
     
-    if (parsedResult.files) {
-      // 文件结果
-      if (Array.isArray(parsedResult.files) && parsedResult.files.length > 1) {
-        resultDiv.innerHTML = processGeneratedFiles(parsedResult);
+    if (typeof parsedResult === 'object' && parsedResult !== null) {
+      if (parsedResult.status === 'success' && parsedResult.message) {
+        // Handle successful operation result
+        const statusContent = document.createElement('div');
+        statusContent.className = 'tool-result-status';
+        statusContent.innerHTML = generateStatusContent(parsedResult);
+        contentDiv.appendChild(statusContent);
+        
+        // For save_file tool, also show the file content
+        if (parsedResult.message.includes('File saved')) {
+          appendFileContent(contentDiv, toolCallDiv, parsedResult);
+        }
+      } else if (parsedResult.files) {
+        // Handle file results
+        contentDiv.innerHTML = processFileResults(parsedResult, Array.isArray(parsedResult.files));
       } else {
-        resultDiv.innerHTML = processFileResult(parsedResult.files[0]);
+        // Handle other object results
+        const pre = document.createElement('pre');
+        pre.className = 'result-json';
+        pre.textContent = JSON.stringify(parsedResult, null, 2);
+        contentDiv.appendChild(pre);
       }
-      
-      // 添加文件结果事件监听器
-      addFileResultEventListeners(resultDiv, parsedResult);
     } else {
-      // 普通结果
-      resultDiv.innerHTML = processToolResult(resultDiv, parsedResult);
+      // Handle primitive values
+      const textDiv = document.createElement('div');
+      textDiv.className = 'result-text';
+      textDiv.textContent = String(parsedResult);
+      contentDiv.appendChild(textDiv);
     }
   } catch (e) {
-    // 非JSON格式，作为纯文本显示
-    resultDiv.textContent = result;
+    console.error('Error processing tool result:', e);
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.textContent = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+    contentDiv.appendChild(errorDiv);
   }
   
-  // 添加到对应的工具调用后面
+  // Add toggle functionality
+  headerDiv.addEventListener('click', () => {
+    const isCollapsed = contentDiv.style.display === 'none';
+    contentDiv.style.display = isCollapsed ? 'block' : 'none';
+    headerDiv.querySelector('.result-toggle').innerHTML = 
+      isCollapsed ? TOOL_DISPLAY.COLLAPSE_ARROW : TOOL_DISPLAY.EXPAND_ARROW;
+  });
+  
   toolCallDiv.appendChild(resultDiv);
   elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
 }
 
-function processToolResult(container, result) {
-  // 格式化JSON结果
-  const formattedResult = JSON.stringify(result, null, 2);
-  
-  // 构建结果UI with content initially collapsed
-  let resultHtml = `
-    <div class="result-header">
-      <span class="result-toggle">${TOOL_DISPLAY.EXPAND_ARROW}</span>
-      <strong>Tool Result</strong>
+/**
+ * Generate status content HTML
+ * @param {Object} result - Result object
+ * @returns {string} Status content HTML
+ */
+function generateStatusContent(result) {
+  let content = `
+    <div class="status-line ${result.status}">
+      <strong>Status:</strong> ${escapeHtml(result.status)}
     </div>
-    <div class="result-content" style="display: none;">
-      <pre class="result-json">${escapeHtml(formattedResult)}</pre>
+    <div class="message-line">
+      <strong>Message:</strong> ${escapeHtml(result.message)}
     </div>
   `;
   
-  // 为结果添加折叠/展开功能
-  setTimeout(() => {
-    const header = container.querySelector('.result-header');
-    const content = container.querySelector('.result-content');
-    const toggle = container.querySelector('.result-toggle');
-    
-    if (header && content && toggle) {
-      header.addEventListener('click', function() {
-        const isCollapsed = content.style.display === 'none';
-        content.style.display = isCollapsed ? 'block' : 'none';
-        toggle.innerHTML = isCollapsed ? TOOL_DISPLAY.COLLAPSE_ARROW : TOOL_DISPLAY.EXPAND_ARROW;
-      });
-    }
-  }, 0);
-  
-  return resultHtml;
-}
-
-function processFileResult(fileResult) {
-  // 基础文件信息
-  let resultHtml = `
-    <div class="file-result">
-      <h4>${escapeHtml(fileResult.name || 'Generated File')}</h4>
-  `;
-  
-  // 文件类型特定处理
-  const isImage = fileResult.mime_type && fileResult.mime_type.startsWith('image/');
-  const isMarkdown = fileResult.name && fileResult.name.endsWith('.md');
-  const isHtml = fileResult.name && (fileResult.name.endsWith('.html') || fileResult.name.endsWith('.htm'));
-  
-  // 添加对应的预览
-  if (isImage && fileResult.url) {
-    resultHtml += `<img src="${fileResult.url}" alt="${escapeHtml(fileResult.name)}" class="file-preview" />`;
-  } else if (isMarkdown && fileResult.url) {
-    resultHtml += `
-      <div class="markdown-actions">
-        <button class="view-markdown-btn" data-url="${fileResult.url}">查看Markdown</button>
-      </div>
-      <div class="markdown-preview" style="display:none;"></div>
-    `;
-  } else if (isHtml && fileResult.url) {
-    resultHtml += `
-      <div class="html-actions">
-        <button class="view-html-btn" data-url="${fileResult.url}">查看HTML</button>
-        <a href="${fileResult.url}" target="_blank" class="open-html-link">在新标签页打开</a>
-      </div>
-      <div class="html-preview" style="display:none;"></div>
-    `;
-  }
-  
-  // 文件下载链接
-  if (fileResult.url) {
-    resultHtml += `
-      <div class="file-download">
-        <a href="${fileResult.url}" download="${fileResult.name}" class="download-link">下载文件</a>
+  if (result.file_path) {
+    content += `
+      <div class="file-path-line">
+        <strong>File:</strong> ${escapeHtml(result.file_path)}
       </div>
     `;
   }
   
-  // 添加文件详细信息（折叠）
-  resultHtml += `
-      <div class="file-details-toggle">详细信息 ${TOOL_DISPLAY.EXPAND_ARROW}</div>
-      <div class="file-details" style="display:none;">
-        <pre>${escapeHtml(JSON.stringify(fileResult, null, 2))}</pre>
-      </div>
-    </div>
-  `;
-  
-  return resultHtml;
+  return content;
 }
 
-function processGeneratedFiles(result) {
-  let filesHtml = `
-    <div class="generated-files">
-      <h4>生成的文件 (${result.files.length})</h4>
-      <ul class="files-list">
-  `;
-  
-  // 为每个文件创建列表项
-  result.files.forEach(file => {
-    filesHtml += `
-      <li class="file-item">
-        <span class="file-name">${escapeHtml(file.name || 'Unnamed File')}</span>
-        <div class="file-actions">
-    `;
-    
-    // 根据文件类型添加操作按钮
-    const isMarkdown = file.name && file.name.endsWith('.md');
-    const isHtml = file.name && (file.name.endsWith('.html') || file.name.endsWith('.htm'));
-    
-    if (isMarkdown && file.url) {
-      filesHtml += `<button class="view-markdown-btn" data-url="${file.url}">查看</button>`;
-    } else if (isHtml && file.url) {
-      filesHtml += `<button class="view-html-btn" data-url="${file.url}">查看</button>`;
-    }
-    
-    // 下载链接
-    if (file.url) {
-      filesHtml += `<a href="${file.url}" download="${file.name}" class="download-link">下载</a>`;
-    }
-    
-    filesHtml += `
-        </div>
-      </li>
-    `;
-  });
-  
-  filesHtml += `
-      </ul>
-      <div class="files-details-toggle">详细信息 ${TOOL_DISPLAY.EXPAND_ARROW}</div>
-      <div class="files-details" style="display:none;">
-        <pre>${escapeHtml(JSON.stringify(result, null, 2))}</pre>
-      </div>
-    </div>
-  `;
-  
-  return filesHtml;
-}
-
-function addFileResultEventListeners(container, parsedResult) {
-  setTimeout(() => {
-    // Markdown查看按钮
-    const markdownBtns = container.querySelectorAll('.view-markdown-btn');
-    markdownBtns.forEach(btn => {
-      btn.addEventListener('click', function() {
-        const url = this.dataset.url;
-        const previewContainer = this.parentElement.nextElementSibling || 
-                                 this.parentElement.parentElement.querySelector('.markdown-preview');
-        
-        if (previewContainer) {
-          if (previewContainer.style.display === 'none') {
-            previewContainer.style.display = 'block';
-            this.textContent = '隐藏Markdown';
-            fetchAndDisplayMarkdown(url, previewContainer);
-          } else {
-            previewContainer.style.display = 'none';
-            this.textContent = '查看Markdown';
-          }
-        }
-      });
-    });
-    
-    // HTML查看按钮
-    const htmlBtns = container.querySelectorAll('.view-html-btn');
-    htmlBtns.forEach(btn => {
-      btn.addEventListener('click', function() {
-        const url = this.dataset.url;
-        const previewContainer = this.parentElement.nextElementSibling || 
-                                this.parentElement.parentElement.querySelector('.html-preview');
-        
-        if (previewContainer) {
-          if (previewContainer.style.display === 'none') {
-            previewContainer.style.display = 'block';
-            this.textContent = '隐藏HTML';
-            displayHtmlPreview(url, previewContainer);
-          } else {
-            previewContainer.style.display = 'none';
-            this.textContent = '查看HTML';
-          }
-        }
-      });
-    });
-    
-    // 文件详情切换
-    const fileDetailsToggles = container.querySelectorAll('.file-details-toggle, .files-details-toggle');
-    fileDetailsToggles.forEach(toggle => {
-      toggle.addEventListener('click', function() {
-        const details = this.nextElementSibling;
-        if (details) {
-          const isCollapsed = details.style.display === 'none';
-          details.style.display = isCollapsed ? 'block' : 'none';
-          this.innerHTML = `详细信息 ${isCollapsed ? TOOL_DISPLAY.COLLAPSE_ARROW : TOOL_DISPLAY.EXPAND_ARROW}`;
-        }
-      });
-    });
-  }, 0);
-}
-
-async function fetchAndDisplayMarkdown(url, container) {
-  if (!container) return;
-  
-  // 显示加载状态
-  container.innerHTML = '<div class="loading-spinner">加载中...</div>';
-  
+/**
+ * Append file content to the result container
+ * @param {HTMLElement} container - Container element
+ * @param {HTMLElement} toolCallDiv - Tool call element
+ * @param {Object} result - Result object
+ */
+function appendFileContent(container, toolCallDiv, result) {
   try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    const toolInput = toolCallDiv.querySelector('.tool-input code');
+    if (!toolInput) return;
+    
+    const inputJson = JSON.parse(toolInput.textContent);
+    if (!inputJson?.content) return;
+    
+    const fileContentDiv = document.createElement('div');
+    fileContentDiv.className = 'file-content';
+    
+    const pre = document.createElement('pre');
+    const code = document.createElement('code');
+    
+    // Set language class based on file extension
+    if (result.file_path) {
+      const extension = result.file_path.split('.').pop().toLowerCase();
+      const languageMap = {
+        py: 'python',
+        js: 'javascript',
+        ts: 'javascript',
+        jsx: 'javascript',
+        tsx: 'javascript',
+        html: 'html',
+        htm: 'html',
+        css: 'css'
+      };
+      code.className = `language-${languageMap[extension] || extension}`;
     }
     
-    const markdownText = await response.text();
+    code.textContent = inputJson.content;
+    pre.appendChild(code);
+    fileContentDiv.appendChild(pre);
+    container.appendChild(fileContentDiv);
     
-    // 简单的Markdown渲染
-    // 注意：实际项目中应使用完整的Markdown解析器
-    let html = markdownText
-      // 标题
-      .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-      .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-      .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-      // 加粗
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      // 斜体
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      // 代码块
-      .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-      // 行内代码
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      // 链接
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
-      // 列表项
-      .replace(/^\s*-\s+(.*$)/gm, '<li>$1</li>')
-      // 段落
-      .replace(/^(?!<[a-z])/gm, '<p>$&</p>');
-    
-    // 将连续的li元素包装在ul中
-    html = html.replace(/<li>[\s\S]*?<\/li>(?=[\s\S]*?<li>|$)/g, '<ul>$&</ul>');
-    
-    // 清理空的p标签
-    html = html.replace(/<p><\/p>/g, '');
-    
-    container.innerHTML = html;
-    
-    // 为链接添加样式和行为
-    const links = container.querySelectorAll('a');
-    links.forEach(link => {
-      link.classList.add('markdown-link');
-    });
-    
-  } catch (error) {
-    console.error('Error loading markdown:', error);
-    container.innerHTML = `<div class="error-message">加载失败: ${error.message}</div>`;
+    try {
+      hljs.highlightElement(code);
+    } catch (err) {
+      console.warn('Failed to highlight code:', err);
+    }
+  } catch (err) {
+    console.warn('Failed to extract file content from tool input:', err);
   }
-}
-
-function displayHtmlPreview(url, container) {
-  if (!container) return;
-  
-  // 创建iframe以安全显示HTML
-  const iframe = document.createElement('iframe');
-  iframe.className = 'html-preview-frame';
-  iframe.setAttribute('sandbox', 'allow-scripts');
-  iframe.src = url;
-  
-  // 创建关闭按钮
-  const closeButton = document.createElement('button');
-  closeButton.className = 'close-preview-btn';
-  closeButton.textContent = '关闭预览';
-  closeButton.addEventListener('click', () => {
-    container.style.display = 'none';
-    // 更新查看按钮文本
-    const viewBtn = container.previousElementSibling.querySelector('.view-html-btn');
-    if (viewBtn) {
-      viewBtn.textContent = '查看HTML';
-    }
-  });
-  
-  // 清除现有内容
-  container.innerHTML = '';
-  container.appendChild(iframe);
-  container.appendChild(closeButton);
 }
 
 /**
@@ -685,9 +701,9 @@ function renderTools(tools) {
 }
 
 /**
- * 转义HTML特殊字符
- * @param {string} text - 要转义的文本
- * @returns {string} 转义后的文本
+ * Escape HTML special characters
+ * @param {string} text - Text to escape
+ * @returns {string} Escaped text
  */
 function escapeHtml(text) {
   if (!text) return '';
@@ -703,7 +719,87 @@ function escapeHtml(text) {
   return text.toString().replace(/[&<>"']/g, char => entities[char]);
 }
 
-// ES模块导出
+/**
+ * Fetch and display markdown content
+ * @param {string} url - URL to fetch markdown from
+ * @param {HTMLElement} container - Container to display markdown in
+ */
+function fetchAndDisplayMarkdown(url, container) {
+  fetch(url)
+    .then(response => response.text())
+    .then(markdown => {
+      try {
+        container.innerHTML = marked.parse(markdown);
+        // Apply syntax highlighting to code blocks
+        container.querySelectorAll('pre code').forEach(block => {
+          hljs.highlightElement(block);
+        });
+      } catch (err) {
+        console.error('Error rendering markdown:', err);
+        container.textContent = markdown;
+      }
+    })
+    .catch(err => {
+      console.error('Error fetching markdown:', err);
+      container.textContent = 'Error loading markdown content';
+    });
+}
+
+/**
+ * Display HTML preview
+ * @param {string} url - URL to fetch HTML from
+ * @param {HTMLElement} container - Container to display HTML in
+ */
+function displayHtmlPreview(url, container) {
+  fetch(url)
+    .then(response => response.text())
+    .then(html => {
+      try {
+        // Create a sandbox iframe
+        const iframe = document.createElement('iframe');
+        iframe.style.width = '100%';
+        iframe.style.height = '400px';
+        iframe.style.border = '1px solid #ddd';
+        container.innerHTML = '';
+        container.appendChild(iframe);
+        
+        // Write the HTML to the iframe
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(html);
+        doc.close();
+      } catch (err) {
+        console.error('Error displaying HTML:', err);
+        container.textContent = 'Error displaying HTML content';
+      }
+    })
+    .catch(err => {
+      console.error('Error fetching HTML:', err);
+      container.textContent = 'Error loading HTML content';
+    });
+}
+
+/**
+ * Show error message
+ * @param {string} message - Error message to display
+ */
+function showError(message) {
+  // Create error message element
+  const errorDiv = document.createElement('div');
+  errorDiv.className = 'message system-message error';
+  errorDiv.textContent = message;
+  
+  // Add to chat
+  if (elements.chatMessages) {
+    elements.chatMessages.appendChild(errorDiv);
+    elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+  }
+  
+  // Log error
+  console.error('UI Error:', message);
+}
+
+// ES module export
 export {
   initializeUI,
   getElements,
@@ -721,5 +817,6 @@ export {
   displayHtmlPreview,
   renderTools,
   escapeHtml,
-  setupToolCallToggle
+  setupToolCallToggle,
+  showError
 }; 

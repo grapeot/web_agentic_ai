@@ -1,18 +1,27 @@
 /**
- * 文件预览模块 - 处理各种文件预览功能
+ * File Preview Module
+ * Handles file preview functionality
  */
+import * as config from './config.js';
+import * as utils from './utils.js';
 
 /**
- * 获取并显示Markdown内容
- * @param {string} url - Markdown文件URL
- * @param {HTMLElement} container - 容器元素
+ * Fetch and display Markdown content
+ * @param {string} url - Markdown file URL
+ * @param {HTMLElement} container - Container element
  */
 async function fetchAndDisplayMarkdown(url, container) {
   const previewContainer = document.createElement('div');
-  previewContainer.className = 'markdown-content-preview';
-  previewContainer.innerHTML = '<div class="preview-loading"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+  previewContainer.className = config.CSS_CLASSES.PREVIEW.MARKDOWN;
+  previewContainer.innerHTML = `
+    <div class="${config.CSS_CLASSES.PREVIEW.LOADING}">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+  `;
   
-  // 找到预览按钮容器并在其后添加
+  // Find preview button container and insert after it
   const btnContainer = container.querySelector('.markdown-preview-btn');
   if (btnContainer) {
     btnContainer.after(previewContainer);
@@ -21,15 +30,15 @@ async function fetchAndDisplayMarkdown(url, container) {
   }
   
   try {
-    // 获取Markdown内容
+    // Fetch Markdown content
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`加载失败: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to load: ${response.status} ${response.statusText}`);
     }
     
     const markdownText = await response.text();
     
-    // 创建marked实例并设置
+    // Create marked instance and configure
     const markedInstance = marked.parse(markdownText, {
       breaks: true,
       smartLists: true,
@@ -41,82 +50,85 @@ async function fetchAndDisplayMarkdown(url, container) {
       }
     });
     
-    // 替换预览内容
-    previewContainer.innerHTML = markedInstance;
+    // Replace preview content
+    previewContainer.innerHTML = `
+      <div class="markdown-preview-header">
+        <button class="btn btn-sm btn-outline-secondary ${config.CSS_CLASSES.PREVIEW.CLOSE_BTN}">
+          <i class="fas fa-times"></i> Close Preview
+        </button>
+      </div>
+      <div class="markdown-preview-content">${markedInstance}</div>
+    `;
     
-    // 添加关闭按钮
-    const closeButton = document.createElement('button');
-    closeButton.className = 'btn btn-sm btn-outline-secondary close-preview-btn';
-    closeButton.innerHTML = '关闭预览';
-    closeButton.addEventListener('click', function() {
-      previewContainer.remove();
-    });
+    // Add close button functionality
+    const closeBtn = previewContainer.querySelector(`.${config.CSS_CLASSES.PREVIEW.CLOSE_BTN}`);
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        previewContainer.remove();
+      });
+    }
     
-    previewContainer.prepend(closeButton);
-    
-    // 为代码块添加行号
+    // Apply syntax highlighting to code blocks
     previewContainer.querySelectorAll('pre code').forEach((block) => {
       hljs.highlightElement(block);
     });
     
-    // 处理链接，打开新窗口
+    // Handle links to open in new tab
     previewContainer.querySelectorAll('a').forEach(link => {
       link.setAttribute('target', '_blank');
       link.setAttribute('rel', 'noopener noreferrer');
     });
   } catch (error) {
-    previewContainer.innerHTML = `<div class="alert alert-danger">预览加载失败: ${error.message}</div>`;
-    console.error('Markdown预览错误:', error);
+    previewContainer.innerHTML = `<div class="alert alert-danger">Preview load failed: ${error.message}</div>`;
+    console.error('Markdown preview error:', error);
   }
 }
 
 /**
- * 显示HTML预览
- * @param {string} url - HTML文件URL
- * @param {HTMLElement} container - 容器元素
+ * Display HTML preview
+ * @param {string} url - HTML file URL
+ * @param {HTMLElement} container - Container element
  */
 function displayHtmlPreview(url, container) {
-  // 创建预览容器
   const previewContainer = document.createElement('div');
-  previewContainer.className = 'html-content-preview';
+  previewContainer.className = config.CSS_CLASSES.PREVIEW.HTML;
   
-  // 创建iframe
-  const iframe = document.createElement('iframe');
-  iframe.src = url;
-  iframe.className = 'html-preview-iframe';
-  iframe.setAttribute('sandbox', 'allow-scripts');
-  iframe.onload = function() {
-    // iframe加载完成后移除加载指示器
-    const loadingElement = previewContainer.querySelector('.preview-loading');
-    if (loadingElement) loadingElement.remove();
-  };
+  // Create iframe container with header
+  previewContainer.innerHTML = `
+    <div class="html-preview-header">
+      <button class="btn btn-sm btn-outline-secondary ${config.CSS_CLASSES.PREVIEW.CLOSE_BTN}">
+        <i class="fas fa-times"></i> Close Preview
+      </button>
+      <a href="${url}" target="_blank" class="btn btn-sm btn-outline-primary">
+        <i class="fas fa-external-link-alt"></i> Open in New Tab
+      </a>
+    </div>
+    <div class="iframe-container">
+      <iframe src="${url}" sandbox="allow-scripts" class="html-preview-iframe"></iframe>
+    </div>
+  `;
   
-  // 添加加载指示器
-  previewContainer.innerHTML = '<div class="preview-loading"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
-  previewContainer.appendChild(iframe);
-  
-  // 添加关闭按钮
-  const closeButton = document.createElement('button');
-  closeButton.className = 'btn btn-sm btn-outline-secondary close-preview-btn';
-  closeButton.innerHTML = '关闭预览';
-  closeButton.addEventListener('click', function() {
-    previewContainer.remove();
-  });
-  
-  previewContainer.prepend(closeButton);
-  
-  // 找到预览按钮容器并在其后添加
+  // Find preview button container and insert after it
   const btnContainer = container.querySelector('.html-preview-btn');
   if (btnContainer) {
     btnContainer.after(previewContainer);
   } else {
     container.appendChild(previewContainer);
   }
+  
+  // Add close button functionality
+  const closeBtn = previewContainer.querySelector(`.${config.CSS_CLASSES.PREVIEW.CLOSE_BTN}`);
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      previewContainer.remove();
+    });
+  }
 }
 
 /**
- * 处理文件结果
- * @param {Object} fileResult - 文件结果对象
+ * Process file result
+ * @param {Object} fileResult - File result object
+ * @returns {Object|null} Processed file info or null if invalid
  */
 function processFileResult(fileResult) {
   if (!fileResult || !fileResult.files || !Array.isArray(fileResult.files)) {
@@ -125,62 +137,13 @@ function processFileResult(fileResult) {
   }
   
   const filesInfo = fileResult.files.map(file => {
-    // 提取文件名
-    const filename = file.path.split('/').pop();
-    
-    // 提取文件扩展名
-    const extension = filename.includes('.') ? filename.split('.').pop().toLowerCase() : '';
-    
-    // 确定文件类型和图标
-    let fileType = 'unknown';
-    let fileIcon = 'fa-file';
-    
-    switch (extension) {
-      case 'md':
-        fileType = 'markdown';
-        fileIcon = 'fa-file-alt';
-        break;
-      case 'html':
-        fileType = 'html';
-        fileIcon = 'fa-file-code';
-        break;
-      case 'js':
-      case 'ts':
-      case 'jsx':
-      case 'tsx':
-        fileType = 'code';
-        fileIcon = 'fa-file-code';
-        break;
-      case 'css':
-      case 'scss':
-      case 'less':
-        fileType = 'style';
-        fileIcon = 'fa-file-code';
-        break;
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-      case 'gif':
-      case 'svg':
-      case 'webp':
-        fileType = 'image';
-        fileIcon = 'fa-file-image';
-        break;
-      case 'pdf':
-        fileType = 'pdf';
-        fileIcon = 'fa-file-pdf';
-        break;
-      default:
-        if (filename.startsWith('.')) {
-          fileType = 'config';
-          fileIcon = 'fa-cog';
-        }
-    }
+    const filename = utils.getFileName(file.path);
+    const fileType = utils.getFileType(filename);
+    const fileIcon = utils.getFileIcon(filename);
     
     return {
       originalFile: file,
       filename,
-      extension,
       fileType,
       fileIcon
     };
@@ -193,21 +156,21 @@ function processFileResult(fileResult) {
 }
 
 /**
- * 处理生成的文件
- * @param {Object} result - 工具结果
- * @returns {string} HTML内容
+ * Process generated files
+ * @param {Object} result - Tool result
+ * @returns {string} HTML content
  */
 function processGeneratedFiles(result) {
   const parsedResult = processFileResult(result);
   if (!parsedResult) {
-    return '<div class="alert alert-warning">无效的文件结果格式</div>';
+    return '<div class="alert alert-warning">Invalid file result format</div>';
   }
   
-  // 创建主容器
+  // Create main container
   const container = document.createElement('div');
   container.className = 'generated-files';
   
-  // 添加说明文本
+  // Add message text
   if (parsedResult.message && parsedResult.message.trim() !== '') {
     const messageElement = document.createElement('div');
     messageElement.className = 'generated-files-message';
@@ -215,40 +178,40 @@ function processGeneratedFiles(result) {
     container.appendChild(messageElement);
   }
   
-  // 创建文件列表
+  // Create file list
   const fileList = document.createElement('div');
   fileList.className = 'file-list';
   
-  // 添加文件项
+  // Add file items
   parsedResult.filesInfo.forEach(fileInfo => {
     const fileItem = document.createElement('div');
-    fileItem.className = 'file-item';
+    fileItem.className = config.CSS_CLASSES.FILE.RESULT;
     fileItem.setAttribute('data-file-path', fileInfo.originalFile.path);
     
-    // 文件图标
+    // File icon
     const iconElement = document.createElement('i');
     iconElement.className = `fas ${fileInfo.fileIcon} file-icon`;
     fileItem.appendChild(iconElement);
     
-    // 文件名
+    // File name
     const nameElement = document.createElement('span');
     nameElement.className = 'file-name';
     nameElement.textContent = fileInfo.filename;
     fileItem.appendChild(nameElement);
     
-    // 添加预览按钮，如果文件类型支持预览
-    if (['markdown', 'html', 'image', 'pdf'].includes(fileInfo.fileType)) {
+    // Add preview button if supported
+    if (['markdown', 'html', 'image'].includes(fileInfo.fileType)) {
       const previewBtn = document.createElement('button');
       previewBtn.className = `btn btn-sm btn-outline-primary ${fileInfo.fileType}-preview-btn`;
-      previewBtn.innerHTML = '<i class="fas fa-eye"></i> 预览';
+      previewBtn.innerHTML = '<i class="fas fa-eye"></i> Preview';
       previewBtn.setAttribute('data-file-url', fileInfo.originalFile.url);
       fileItem.appendChild(previewBtn);
     }
     
-    // 添加下载按钮
+    // Add download button
     const downloadBtn = document.createElement('a');
-    downloadBtn.className = 'btn btn-sm btn-outline-success file-download-btn';
-    downloadBtn.innerHTML = '<i class="fas fa-download"></i> 下载';
+    downloadBtn.className = `btn btn-sm btn-outline-success ${config.CSS_CLASSES.FILE.DOWNLOAD_LINK}`;
+    downloadBtn.innerHTML = '<i class="fas fa-download"></i> Download';
     downloadBtn.setAttribute('href', fileInfo.originalFile.url);
     downloadBtn.setAttribute('download', fileInfo.filename);
     fileItem.appendChild(downloadBtn);
@@ -263,67 +226,67 @@ function processGeneratedFiles(result) {
 }
 
 /**
- * 为文件结果添加事件监听器
- * @param {HTMLElement} container - 容器元素
- * @param {Object} parsedResult - 处理后的结果
+ * Add event listeners for file result
+ * @param {HTMLElement} container - Container element
+ * @param {Object} parsedResult - Processed result
  */
 function addFileResultEventListeners(container, parsedResult) {
-  // 处理markdown预览
+  // Handle markdown preview
   container.querySelectorAll('.markdown-preview-btn').forEach(btn => {
     btn.addEventListener('click', function() {
       const fileUrl = this.getAttribute('data-file-url');
       if (fileUrl) {
-        const fileItemContainer = this.closest('.file-item');
+        const fileItemContainer = this.closest(`.${config.CSS_CLASSES.FILE.RESULT}`);
         fetchAndDisplayMarkdown(fileUrl, fileItemContainer);
       }
     });
   });
   
-  // 处理HTML预览
+  // Handle HTML preview
   container.querySelectorAll('.html-preview-btn').forEach(btn => {
     btn.addEventListener('click', function() {
       const fileUrl = this.getAttribute('data-file-url');
       if (fileUrl) {
-        const fileItemContainer = this.closest('.file-item');
+        const fileItemContainer = this.closest(`.${config.CSS_CLASSES.FILE.RESULT}`);
         displayHtmlPreview(fileUrl, fileItemContainer);
       }
     });
   });
   
-  // 处理图像预览
+  // Handle image preview
   container.querySelectorAll('.image-preview-btn').forEach(btn => {
     btn.addEventListener('click', function() {
       const fileUrl = this.getAttribute('data-file-url');
       if (fileUrl) {
-        const fileItemContainer = this.closest('.file-item');
+        const fileItemContainer = this.closest(`.${config.CSS_CLASSES.FILE.RESULT}`);
         
-        // 移除现有预览
-        const existingPreview = fileItemContainer.querySelector('.image-preview-container');
+        // Remove existing preview
+        const existingPreview = fileItemContainer.querySelector(`.${config.CSS_CLASSES.PREVIEW.IMAGE}`);
         if (existingPreview) {
           existingPreview.remove();
           return;
         }
         
-        // 创建预览容器
+        // Create preview container
         const previewContainer = document.createElement('div');
-        previewContainer.className = 'image-preview-container';
+        previewContainer.className = config.CSS_CLASSES.PREVIEW.IMAGE;
         
-        // 创建图像元素
+        // Create image element
         const imageElement = document.createElement('img');
         imageElement.src = fileUrl;
-        imageElement.className = 'image-preview';
+        imageElement.className = 'preview-image';
         previewContainer.appendChild(imageElement);
         
-        // 添加关闭按钮
+        // Add close button
         const closeButton = document.createElement('button');
-        closeButton.className = 'btn btn-sm btn-outline-secondary close-preview-btn';
-        closeButton.innerHTML = '关闭预览';
+        closeButton.className = `btn btn-sm btn-outline-secondary ${config.CSS_CLASSES.PREVIEW.CLOSE_BTN}`;
+        closeButton.innerHTML = '<i class="fas fa-times"></i> Close Preview';
         closeButton.addEventListener('click', function() {
           previewContainer.remove();
         });
         previewContainer.prepend(closeButton);
         
-        // 添加到文件项
+        // Add to file item
         fileItemContainer.appendChild(previewContainer);
       }
     });

@@ -1,11 +1,13 @@
 /**
- * 工具函数模块 - 包含各种辅助函数
+ * Utility Functions Module
+ * Contains helper functions used across the application
  */
+import * as config from './config.js';
 
 /**
- * 转义HTML特殊字符
- * @param {string} text - 要转义的文本
- * @returns {string} 转义后的文本
+ * Escape HTML special characters
+ * @param {string} text - Text to escape
+ * @returns {string} Escaped text
  */
 function escapeHtml(text) {
   if (!text) return '';
@@ -20,10 +22,10 @@ function escapeHtml(text) {
 }
 
 /**
- * 安全地解析JSON字符串
- * @param {string} jsonString - 要解析的JSON字符串
- * @param {*} defaultValue - 如果解析失败返回的默认值
- * @returns {*} 解析结果或默认值
+ * Safely parse JSON string
+ * @param {string} jsonString - JSON string to parse
+ * @param {*} defaultValue - Default value if parsing fails
+ * @returns {*} Parsed result or default value
  */
 function safeJsonParse(jsonString, defaultValue = null) {
   if (!jsonString) return defaultValue;
@@ -31,47 +33,47 @@ function safeJsonParse(jsonString, defaultValue = null) {
   try {
     return JSON.parse(jsonString);
   } catch (error) {
-    console.error('JSON解析错误:', error);
+    console.error('JSON parse error:', error);
     return defaultValue;
   }
 }
 
 /**
- * 安全地将值转换为JSON字符串
- * @param {*} value - 要转换的值
- * @param {number} indent - 缩进空格数
- * @returns {string} JSON字符串
+ * Safely stringify value to JSON
+ * @param {*} value - Value to stringify
+ * @param {number} indent - Indentation spaces
+ * @returns {string} JSON string
  */
 function safeJsonStringify(value, indent = 2) {
   try {
     return JSON.stringify(value, null, indent);
   } catch (error) {
-    console.error('JSON字符串化错误:', error);
+    console.error('JSON stringify error:', error);
     return '{}';
   }
 }
 
 /**
- * 深度克隆对象
- * @param {*} obj - 要克隆的对象
- * @returns {*} 克隆后的对象
+ * Deep clone object
+ * @param {*} obj - Object to clone
+ * @returns {*} Cloned object
  */
 function deepClone(obj) {
   if (obj === null || typeof obj !== 'object') {
     return obj;
   }
   
-  // 处理Date
+  // Handle Date
   if (obj instanceof Date) {
     return new Date(obj.getTime());
   }
   
-  // 处理数组
+  // Handle Array
   if (Array.isArray(obj)) {
     return obj.map(item => deepClone(item));
   }
   
-  // 处理对象
+  // Handle Object
   const cloned = {};
   Object.keys(obj).forEach(key => {
     cloned[key] = deepClone(obj[key]);
@@ -81,9 +83,9 @@ function deepClone(obj) {
 }
 
 /**
- * 从路径中获取文件名
- * @param {string} path - 文件路径
- * @returns {string} 文件名
+ * Get filename from path
+ * @param {string} path - File path
+ * @returns {string} Filename
  */
 function getFileName(path) {
   if (!path) return '';
@@ -93,27 +95,86 @@ function getFileName(path) {
 }
 
 /**
- * 从URL中获取参数
- * @param {string} name - 参数名
- * @param {string} url - URL，默认为当前页面URL
- * @returns {string|null} 参数值，如果不存在则返回null
+ * Get file extension from filename
+ * @param {string} filename - Filename
+ * @returns {string} File extension
  */
-function getUrlParameter(name, url = window.location.href) {
-  name = name.replace(/[\[\]]/g, '\\$&');
-  const regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)');
-  const results = regex.exec(url);
+function getFileExtension(filename) {
+  if (!filename) return '';
   
-  if (!results) return null;
-  if (!results[2]) return '';
-  
-  return decodeURIComponent(results[2].replace(/\+/g, ' '));
+  const parts = filename.split('.');
+  return parts.length > 1 ? parts.pop().toLowerCase() : '';
 }
 
 /**
- * 防抖函数
- * @param {Function} func - 要防抖的函数
- * @param {number} wait - 等待时间（毫秒）
- * @returns {Function} 防抖后的函数
+ * Get file type based on extension
+ * @param {string} filename - Filename
+ * @returns {string} File type (image, markdown, html, code, style, unknown)
+ */
+function getFileType(filename) {
+  const extension = getFileExtension(filename);
+  
+  if (config.FILE_PREVIEW.SUPPORTED_TYPES.IMAGE.includes(extension)) {
+    return 'image';
+  }
+  if (config.FILE_PREVIEW.SUPPORTED_TYPES.MARKDOWN.includes(extension)) {
+    return 'markdown';
+  }
+  if (config.FILE_PREVIEW.SUPPORTED_TYPES.HTML.includes(extension)) {
+    return 'html';
+  }
+  if (config.FILE_PREVIEW.SUPPORTED_TYPES.CODE.includes(extension)) {
+    return 'code';
+  }
+  if (config.FILE_PREVIEW.SUPPORTED_TYPES.STYLE.includes(extension)) {
+    return 'style';
+  }
+  
+  return 'unknown';
+}
+
+/**
+ * Get file icon class based on file type
+ * @param {string} filename - Filename
+ * @returns {string} Font Awesome icon class
+ */
+function getFileIcon(filename) {
+  const extension = getFileExtension(filename);
+  const fileType = getFileType(filename);
+  
+  switch (fileType) {
+    case 'image':
+      return config.FILE_PREVIEW.ICONS.IMAGE;
+    case 'code':
+    case 'style':
+      return config.FILE_PREVIEW.ICONS.CODE;
+    case 'pdf':
+      return config.FILE_PREVIEW.ICONS.PDF;
+    default:
+      if (filename.startsWith('.')) {
+        return config.FILE_PREVIEW.ICONS.CONFIG;
+      }
+      return config.FILE_PREVIEW.ICONS.FILE;
+  }
+}
+
+/**
+ * Clean up line breaks in text
+ * @param {string} text - Text to clean
+ * @returns {string} Cleaned text
+ */
+function cleanLineBreaks(text) {
+  if (!text) return '';
+  
+  // Replace 3 or more consecutive line breaks with 2
+  return text.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
+ * Debounce function
+ * @param {Function} func - Function to debounce
+ * @param {number} wait - Wait time in milliseconds
+ * @returns {Function} Debounced function
  */
 function debounce(func, wait = 300) {
   let timeout;
@@ -130,10 +191,10 @@ function debounce(func, wait = 300) {
 }
 
 /**
- * 节流函数
- * @param {Function} func - 要节流的函数
- * @param {number} limit - 限制时间（毫秒）
- * @returns {Function} 节流后的函数
+ * Throttle function
+ * @param {Function} func - Function to throttle
+ * @param {number} limit - Time limit in milliseconds
+ * @returns {Function} Throttled function
  */
 function throttle(func, limit = 300) {
   let inThrottle;
@@ -151,14 +212,14 @@ function throttle(func, limit = 300) {
 }
 
 /**
- * 格式化时间戳
- * @param {number} timestamp - 时间戳（毫秒）
- * @returns {string} 格式化后的时间字符串
+ * Format timestamp
+ * @param {number} timestamp - Timestamp in milliseconds
+ * @returns {string} Formatted date string
  */
 function formatTimestamp(timestamp) {
   const date = new Date(timestamp);
   
-  return date.toLocaleString('zh-CN', {
+  return date.toLocaleString('en-US', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -169,9 +230,9 @@ function formatTimestamp(timestamp) {
 }
 
 /**
- * 生成随机ID
- * @param {number} length - ID长度
- * @returns {string} 随机ID
+ * Generate random ID
+ * @param {number} length - ID length
+ * @returns {string} Random ID
  */
 function generateRandomId(length = 8) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -190,7 +251,10 @@ export {
   safeJsonStringify,
   deepClone,
   getFileName,
-  getUrlParameter,
+  getFileExtension,
+  getFileType,
+  getFileIcon,
+  cleanLineBreaks,
   debounce,
   throttle,
   formatTimestamp,

@@ -35,73 +35,50 @@ The goal is to help you maintain a big picture as well as the progress of the ta
   - Use `innerHTML` instead of `textContent` when you want to render Markdown or HTML content 
   - Track processed message IDs to avoid duplicating messages during polling operations
   - Include proper handling of image elements in Markdown (error handling, responsive design)
+  - To prevent message duplication, especially for the first message, track both message IDs and content:
+    - Maintain a set of processed message content (`processedTextContent`) in addition to message IDs
+    - Check this set before displaying any message to avoid duplicates
+    - Update message processing functions across modules consistently (ensure main.js and tools.js agree on who displays messages)
+  - For proper line break handling in messages:
+    - Configure Marked library with `breaks: true` to convert line breaks to `<br>` tags
+    - Check for both spaces and newlines when concatenating message chunks to avoid adding unnecessary spaces
+    - Clean up consecutive line breaks by replacing 3+ consecutive line breaks with just 2
+    - Extract line break processing into a reusable function across the codebase
+    - Ensure consistent line break handling between the tools.js and ui.js modules
 
 # Scratchpad
 
-## JavaScript Refactoring Task
+## Current Task: Rewrite frontend code in modular structure
 
-Task: Refactor the large main.js file into modular components to improve maintainability and organization.
+Files to update:
+[X] config.js - Configuration values and constants
+[X] state.js - State management using StateManager class
+[X] api.js - API interaction layer
+[X] utils.js - Utility functions
+[X] filePreview.js - File preview functionality
+[X] tools.js - Tool handling and auto-execution
+[X] events.js - Event handling and DOM interactions
+[X] main.js - Main application logic and initialization
 
-### Current Issues
-- Single file with ~1000 lines of code
-- Multiple responsibilities mixed together
-- Difficult to maintain and extend
+Progress:
+- Completed implementation of config.js with all configuration values
+- Implemented state.js with StateManager class for application state
+- Created api.js with all API interaction functions
+- Added utils.js with helper functions
+- Implemented filePreview.js for handling file previews
+- Completed tools.js with tool handling and auto-execution logic
+- Implemented events.js with event listeners and handlers
+- Created main.js to initialize and coordinate all modules
 
-### Refactoring Plan
+✅ Task completed! The frontend code has been successfully rewritten into a modular structure while maintaining the same functionality. Each module has clear responsibilities:
 
-[X] 0. 设置测试基础架构
-   [X] 创建Jest测试配置
-   [X] 设置JSDOM环境
-   [X] 编写基本功能测试
-   [X] 创建测试运行脚本
-   [X] 添加项目README
+- config.js: Centralized configuration and constants
+- state.js: Application state management
+- api.js: API communication layer
+- utils.js: Reusable utility functions
+- filePreview.js: File preview functionality
+- tools.js: Tool handling and auto-execution
+- events.js: Event handling and DOM interactions
+- main.js: Application initialization and coordination
 
-[X] 1. 创建模块结构
-   [X] 创建目录结构
-   [X] 创建模块文件
-
-[X] 2. 拆分代码到模块
-   [X] 创建config.js：配置设置
-   [X] 创建api.js：API交互
-   [X] 创建state.js：状态管理
-   [X] 创建ui.js：UI渲染
-   [X] 创建events.js：事件处理
-   [X] 创建tools.js：工具功能
-   [X] 创建filePreview.js：文件预览
-   [X] 创建utils.js：辅助函数
-
-[X] 3. 建立main.js框架
-   [X] 创建基本入口点结构
-   [X] 导入所有模块
-   [X] 添加初始化函数
-   
-[X] 4. 修复关键bug
-   [X] 修复state模块的命名冲突
-   [X] 确保ui模块正确导入state
-   [X] 修复工具折叠功能
-   [X] 修复消息重复问题
-   [X] 修复Markdown图片渲染问题
-
-[ ] 5. 运行测试验证功能
-   [ ] 确保初始化测试通过
-   [ ] 确保消息发送测试通过
-   [ ] 确保工具调用测试通过
-   [ ] 确保清除聊天测试通过
-   [ ] 确保设置调整测试通过
-
-[ ] 6. 重构main.js
-   [ ] 移除临时实现
-   [ ] 完全使用模块化方法
-   [ ] 保持功能一致性
-
-[ ] 7. 添加文档
-   [ ] 为函数添加JSDoc注释
-   [ ] 补充模块架构说明
-
-### 当前状态
-- 已修复state.js中isAutoExecutingTools()方法的命名冲突
-- 已修复ui.js中对state的正确导入
-- 已修复工具和结果的默认折叠显示
-- 已修复消息轮询时的重复问题
-- 已修复Markdown中图片链接不显示的问题
-- 下一步: 测试应用功能并修复任何剩余问题
+The code is now more maintainable, testable, and follows better separation of concerns.

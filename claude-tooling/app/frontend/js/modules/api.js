@@ -1,11 +1,11 @@
 /**
- * API模块 - 封装所有API交互
+ * API Module - Encapsulates all API interactions
  */
 import * as config from './config.js';
 
 /**
- * 获取可用工具列表
- * @returns {Promise<Object>} 包含工具列表的响应
+ * Fetch available tools
+ * @returns {Promise<Object>} Response containing the tools list
  */
 async function fetchAvailableTools() {
   try {
@@ -21,13 +21,26 @@ async function fetchAvailableTools() {
 }
 
 /**
- * 发送聊天消息
- * @param {Array} messages - 消息历史数组
- * @param {Object} settings - 聊天设置
- * @param {string} [conversationId] - 对话ID（如果继续对话）
- * @returns {Promise<Object>} 聊天响应
+ * Send chat message
+ * @param {Array} messages - Message history array
+ * @param {Object} settings - Chat settings
+ * @param {string} [conversationId] - Conversation ID (if continuing conversation)
+ * @returns {Promise<Object>} Chat response
  */
 async function sendMessage(messages, settings, conversationId = null) {
+  // Ensure messages is an array and contains at least one message
+  if (!Array.isArray(messages)) {
+    messages = [];
+  }
+  
+  // Add the current message if messages array is empty
+  if (messages.length === 0) {
+    messages.push({
+      role: 'user',
+      content: 'Hello'
+    });
+  }
+  
   const requestBody = {
     messages,
     temperature: settings.temperature,
@@ -37,12 +50,16 @@ async function sendMessage(messages, settings, conversationId = null) {
     auto_execute_tools: settings.autoExecuteTools
   };
   
-  // 构建API端点
+  // Debug log
+  console.log('Sending request with body:', JSON.stringify(requestBody, null, 2));
+  
+  // Build API endpoint
   let apiEndpoint = `${config.API_URL}/api/chat`;
   
-  // 如果存在对话ID，添加为URL参数
+  // If conversation ID exists, add as URL parameter
   if (conversationId) {
     apiEndpoint += `?conversation_id=${encodeURIComponent(conversationId)}`;
+    console.log(`Continuing conversation: ${conversationId}`);
   }
   
   try {
@@ -55,7 +72,8 @@ async function sendMessage(messages, settings, conversationId = null) {
     });
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json().catch(() => null);
+      throw new Error(`HTTP error! status: ${response.status}, details: ${JSON.stringify(errorData)}`);
     }
     
     return await response.json();
@@ -66,12 +84,12 @@ async function sendMessage(messages, settings, conversationId = null) {
 }
 
 /**
- * 提交工具结果
- * @param {string} toolUseId - 工具使用ID
- * @param {string} result - 工具执行结果
- * @param {string} conversationId - 对话ID
- * @param {boolean} autoExecuteTools - 是否自动执行工具
- * @returns {Promise<Object>} 响应数据
+ * Submit tool result
+ * @param {string} toolUseId - Tool use ID
+ * @param {string} result - Tool execution result
+ * @param {string} conversationId - Conversation ID
+ * @param {boolean} autoExecuteTools - Whether to auto-execute tools
+ * @returns {Promise<Object>} Response data
  */
 async function submitToolResult(toolUseId, result, conversationId, autoExecuteTools) {
   const requestBody = {
@@ -103,9 +121,9 @@ async function submitToolResult(toolUseId, result, conversationId, autoExecuteTo
 }
 
 /**
- * 获取对话更新
- * @param {string} conversationId - 对话ID
- * @returns {Promise<Object>} 更新的消息
+ * Get conversation updates
+ * @param {string} conversationId - Conversation ID
+ * @returns {Promise<Object|null>} Updated messages or null if conversation not found
  */
 async function getConversationUpdates(conversationId) {
   try {
@@ -113,6 +131,7 @@ async function getConversationUpdates(conversationId) {
     
     if (!response.ok) {
       if (response.status === 404) {
+        console.log('Conversation not found');
         return null;
       }
       throw new Error(`HTTP error! status: ${response.status}`);

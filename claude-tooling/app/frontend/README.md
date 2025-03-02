@@ -1,193 +1,195 @@
-# Claude Tooling 前端重构
+# Frontend Documentation
 
-## 项目概述
+## Overview
 
-该项目是一个基于Claude API的聊天工具，支持工具调用、文件生成等功能。当前代码库需要进行重构，以提高代码可维护性和组织结构。
+The frontend implements a chat interface with support for:
+- Text messages
+- Tool calls and results
+- File previews
+- Markdown/HTML rendering
+- Auto-execution of tools
+- Real-time updates via polling
 
-## 重构计划
+## Message Rendering Logic
 
-我们计划将单一的`main.js`文件拆分为多个功能模块：
+### Message Types
 
-```
-js/
-├── modules/
-│   ├── config.js      # 配置设置
-│   ├── api.js         # API交互
-│   ├── state.js       # 状态管理
-│   ├── ui.js          # UI渲染
-│   ├── events.js      # 事件处理
-│   ├── tools.js       # 工具功能
-│   ├── filePreview.js # 文件预览功能
-│   └── utils.js       # 辅助函数
-├── main.js            # 主入口点
-└── tests/
-    ├── setup.js       # 测试设置
-    └── main.test.js   # 功能测试
-```
+1. **Text Messages**
+   - User messages: Simple text with Markdown support
+   - Assistant messages: Text with Markdown support
+   - Thinking process: Special format showing Claude's thinking
 
-## 关键需求
+2. **Tool Calls**
+   - Collapsible sections with:
+     - Header showing tool name
+     - Input parameters in JSON format
+     - Result container for tool output
+   - Toggle functionality for expanding/collapsing
 
-1. **模块化架构**：将代码分解为独立、可维护的模块
-2. **浏览器兼容性**：确保代码能够在现代浏览器中正常运行
-3. **测试覆盖**：保持功能的完整测试覆盖
-4. **性能优化**：保持或提高应用性能
+3. **Tool Results**
+   - Can be standalone or attached to tool calls
+   - Special handling for different result types:
+     - File results (images, markdown, html)
+     - Command outputs
+     - JSON data
+     - Generated files
 
-## 当前进度
+### Rendering Flow
 
-- [x] 设置测试基础架构：Jest、JSDOM环境、测试用例、运行脚本
-- [x] 创建模块目录结构
-- [x] 拆分代码到模块：
-  - [x] 创建config.js：配置设置
-  - [x] 创建api.js：API交互
-  - [x] 创建state.js：状态管理
-  - [x] 创建ui.js：UI渲染
-  - [x] 创建events.js：事件处理
-  - [x] 创建tools.js：工具功能
-  - [x] 创建filePreview.js：文件预览
-  - [x] 创建utils.js：辅助函数
-- [x] 更新main.js入口点
-- [x] 转换为ES模块格式
-- [x] 修复浏览器兼容性问题：
-  - [x] 修复state模块命名冲突
-  - [x] 修复UI模块的state导入
-  - [x] 修复工具自动执行功能
-- [ ] 运行测试验证功能正确性
-- [ ] 补充完整文档
-
-## 已解决的问题
-
-1. **状态管理命名冲突**：在`state.js`中，发现`isAutoExecutingTools`同时被用作属性名和方法名，导致无限递归。已通过将属性重命名为`autoExecutingTools`来解决。
-
-2. **模块导入问题**：在`ui.js`模块中，对`state`模块的导入方式有误，已从`import * as state from './state.js'`改为`import { state } from './state.js'`以正确导入单例实例。
-
-3. **工具调用UI问题**：工具调用和结果默认不折叠，已修改相关代码确保默认折叠。
-
-4. **测试兼容性问题**：Jest配置文件需要使用CommonJS格式，而项目使用ES模块格式。已通过将配置文件重命名为`jest.config.cjs`并修改package.json来解决。
-
-## ES模块转换
-
-为了确保代码在浏览器中正常运行，我们将所有模块从CommonJS格式转换为ES模块格式：
-
-### 转换内容
-
-1. 将所有`require()`语句转换为`import`语句
-2. 将`module.exports`转换为`export {}`语句
-3. 在HTML中添加`type="module"`属性到脚本标签
-4. 更新测试环境兼容性逻辑
-
-### 设计决策
-
-1. **测试环境兼容性**：为了保持测试与浏览器环境的兼容性，我们用条件检测代替了直接的CommonJS导出：
+1. **Message Addition**
    ```javascript
-   // 为了在测试环境中兼容CommonJS
-   if (isTestEnvironment) {
-     window.testExports = {
-       // 导出函数
-     };
-   }
+   addMessageToChat(role, content)
    ```
+   - Creates message container with appropriate class
+   - Processes content through Markdown parser
+   - Applies syntax highlighting to code blocks
+   - Handles image loading and zoom functionality
 
-2. **模块依赖关系**：确保模块间依赖清晰，避免循环依赖
-   - config.js 无依赖
-   - state.js 依赖 config.js
-   - api.js 依赖 config.js
-   - ui.js 依赖 config.js, state.js
-   - events.js 依赖 state.js, ui.js, api.js, tools.js
-   - tools.js 依赖 config.js, state.js, ui.js, api.js
-   - filePreview.js 无外部依赖
-   - utils.js 无外部依赖
-   - main.js 依赖所有模块
+2. **Tool Call Addition**
+   ```javascript
+   addToolCallToChat(toolCall)
+   ```
+   - Creates collapsible tool call container
+   - Formats input parameters as JSON
+   - Prepares result container
+   - Sets up event listeners for toggling
 
-3. **初始化流程**：通过main.js中的initApp函数协调模块初始化顺序
-   - 首先初始化UI
-   - 然后设置事件监听器
-   - 最后获取可用工具列表
+3. **Tool Result Addition**
+   ```javascript
+   addToolResultToChat(result, toolUseId)
+   ```
+   - Finds matching tool call container
+   - Processes result based on type:
+     - File results: Preview + download options
+     - Command output: Formatted display
+     - JSON data: Pretty printed
+   - Adds interactive elements (preview buttons, toggles)
 
-## 学习内容
+## File Handling
 
-1. **ES模块与CommonJS的区别**：
-   - ES模块默认是静态的，导入发生在解析阶段
-   - CommonJS是动态的，导入发生在运行时
-   - ES模块支持顶级await，CommonJS不支持
-   - ES模块有更好的树摇（tree-shaking）支持
+### Supported File Types
 
-2. **浏览器中的模块加载**：
-   - 浏览器通过`type="module"`属性识别ES模块
-   - 模块脚本默认延迟加载（类似defer）
-   - 模块导入使用CORS加载
-   - 模块只加载和执行一次
+1. **Images**
+   - Direct inline display
+   - Click to zoom
+   - Download option
 
-3. **测试兼容性**：
-   - 测试环境（Node.js）和浏览器环境对模块处理有差异
-   - 需要适配两种环境，保持代码一致性
-   - Jest测试框架主要支持CommonJS模块
-   - 可以通过文件扩展名(.cjs)强制使用CommonJS格式
+2. **Markdown**
+   - Preview button
+   - Rendered view with syntax highlighting
+   - Close/expand options
 
-4. **命名规范重要性**：
-   - 避免方法名和属性名相同，以防止递归调用和混淆
-   - 使用统一的命名规范提高代码可读性
-   - 命名冲突通常很难调试，应当在设计阶段避免
+3. **HTML**
+   - Preview in sandbox iframe
+   - Open in new tab option
+   - Security restrictions applied
 
-## 下一步计划
+### File Result Structure
 
-1. **完善浏览器测试**：继续测试并修复任何浏览器中的渲染或功能问题
-2. **测试环境适配**：完善Jest测试环境与ES模块的兼容性
-3. **测试全面性**：确保所有功能都有测试覆盖
-4. **逐步验证功能**：每个模块分别验证功能正确性
-5. **优化模块结构**：基于测试反馈调整模块设计
-6. **完善错误处理**：增强每个模块的错误处理和恢复能力
-7. **文档补充**：为所有公共API添加详细文档
-
-## 测试设置
-
-为确保重构后功能正确性，我们已设置自动化测试：
-
-1. **Jest测试框架** - 用于测试JavaScript代码
-2. **JSDOM** - 用于模拟DOM环境
-3. **功能测试** - 验证关键功能流程
-
-## 浏览器兼容性
-
-为确保在浏览器中正确运行，我们采取以下措施：
-
-1. **使用ES模块语法** - 适用于所有现代浏览器
-2. **支持动态导入** - 用于条件加载大型依赖
-3. **模块预加载** - 优化性能并减少瀑布加载
-4. **兼容性检测** - 在运行时检测浏览器ES模块支持
-5. **命名规范检查** - 避免属性和方法的命名冲突
-
-## 测试与验证
-
-### 运行测试
-
-```bash
-# 方法1：使用提供的脚本
-./run-tests.sh
-
-# 方法2：手动运行
-npm install  # 首次运行时安装依赖
-npm test
+```javascript
+{
+  status: "success",
+  file_path: string,
+  file_url: string,
+  render_type: "image" | "markdown" | "html",
+  view_url?: string
+}
 ```
 
-### 主要测试用例
+## Real-time Updates
 
-- 应用初始化：验证DOM元素和API调用
-- 发送消息：验证用户消息发送和响应显示
-- 工具调用：验证工具调用流程和结果处理
-- 聊天清除：验证清除聊天功能
-- 设置调整：验证设置项更新
+### Polling Mechanism
 
-## 重构实施步骤
+1. **Initialization**
+   - Starts when auto-execute is enabled
+   - 5-second interval checks
 
-1. **创建模块结构**：首先建立文件夹和空文件
-2. **提取共享配置**：创建config.js提取所有配置常量
-3. **分离API交互**：将所有API调用移至api.js
-4. **实现状态管理**：创建state.js管理应用状态
-5. **分离UI渲染**：将DOM操作集中到ui.js
-6. **分离工具功能**：将工具相关逻辑移至tools.js
-7. **分离事件处理**：将事件监听器和处理逻辑移至events.js
-8. **分离文件预览**：将文件预览功能移至filePreview.js
-9. **提取辅助函数**：将通用函数提取到utils.js
-10. **更新主入口**：更新main.js以导入和初始化模块
+2. **Update Process**
+   - Fetches new messages
+   - Tracks displayed content to prevent duplicates
+   - Updates UI progressively
 
-每完成一个模块的重构，都会运行测试以确保功能正确性。 
+3. **State Management**
+   - Maintains conversation history
+   - Tracks tool calls and results
+   - Manages auto-execution state
+
+## UI Components
+
+### Message Display
+- Chat container with scrolling
+- Message bubbles with role-based styling
+- Code block formatting
+- Image handling
+
+### Tool Interface
+- Collapsible sections
+- JSON formatting
+- Result previews
+- Interactive elements
+
+### Control Elements
+- Send button
+- Temperature/token controls
+- Auto-execute toggle
+- Clear chat function
+
+## Best Practices
+
+1. **Error Handling**
+   - Graceful fallbacks for parsing errors
+   - Image load error handling
+   - Network request error management
+
+2. **Performance**
+   - Lazy loading of previews
+   - Efficient DOM updates
+   - Debounced polling
+
+3. **Security**
+   - HTML sanitization
+   - Sandboxed iframes
+   - URL validation
+
+4. **Accessibility**
+   - ARIA labels
+   - Keyboard navigation
+   - Screen reader support
+
+## Event Handling
+
+1. **User Interactions**
+   - Message sending
+   - Tool result submission
+   - Preview toggling
+   - File downloads
+
+2. **System Events**
+   - Auto-execution updates
+   - Polling responses
+   - Error conditions
+
+## State Management
+
+1. **Conversation State**
+   - Message history
+   - Current tool call
+   - Auto-execution status
+
+2. **UI State**
+   - Loading indicators
+   - Preview states
+   - Collapse states
+
+## Integration Points
+
+1. **API Endpoints**
+   - Chat messages
+   - Tool results
+   - File handling
+   - Status updates
+
+2. **External Libraries**
+   - Marked (Markdown parsing)
+   - Highlight.js (code highlighting)
+   - Bootstrap (UI components) 

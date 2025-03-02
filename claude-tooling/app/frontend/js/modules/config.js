@@ -1,38 +1,37 @@
 /**
- * 配置模块 - 包含应用常量和设置
+ * Configuration Module
+ * Contains application constants and settings
  */
 
 /**
- * API端点配置
- * 动态检测API端点
+ * API endpoint configuration
+ * Dynamically detect API endpoint
  */
-// 更灵活的API URL检测
 const API_URL = (() => {
-  // 检查是否存在环境变量或全局配置
+  // Check for environment variables or global config
   if (window.API_BASE_URL) {
     return window.API_BASE_URL;
   }
 
-  // 如果在同一域名下访问前端和API（由FastAPI的mount静态文件提供）
+  // If frontend and API are accessed under same domain (served by FastAPI's mount static files)
   if (window.location.pathname.startsWith('/frontend/')) {
-    // 使用相同的origin，但路径不带/frontend
+    // Use same origin but without /frontend path
     return window.location.origin;
   }
 
-  // 开发环境下，或者分离部署时的默认回退方案
-  // 尝试使用相对路径，让web服务器处理代理
+  // Development environment or fallback for separate deployment
+  // Use relative path, let web server handle proxy
   return '';
 })();
 
 /**
- * 轮询间隔（毫秒）
- * 用于自动执行工具时的更新轮询
+ * Polling interval (milliseconds)
+ * Used for update polling during auto tool execution
  */
-const POLLING_INTERVAL = 5000; // 5秒
+const POLLING_INTERVAL = 5000; // 5 seconds
 
 /**
- * 默认设置
- * 应用的默认设置值
+ * Default settings
  */
 const DEFAULT_SETTINGS = {
   temperature: 0.5,
@@ -43,16 +42,16 @@ const DEFAULT_SETTINGS = {
 };
 
 /**
- * 工具结果展示配置
+ * Tool display configuration
  */
 const TOOL_DISPLAY = {
-  INITIAL_COLLAPSED: true,  // 工具调用默认折叠
-  EXPAND_ARROW: '&#9654;',  // 展开箭头Unicode (▶)
-  COLLAPSE_ARROW: '&#9660;' // 折叠箭头Unicode (▼)
+  INITIAL_COLLAPSED: true,  // Tool calls default to collapsed
+  EXPAND_ARROW: '&#9654;',  // Expand arrow Unicode (▶)
+  COLLAPSE_ARROW: '&#9660;' // Collapse arrow Unicode (▼)
 };
 
 /**
- * 消息类型常量
+ * Message type constants
  */
 const MESSAGE_TYPES = {
   TEXT: 'text',
@@ -61,7 +60,7 @@ const MESSAGE_TYPES = {
 };
 
 /**
- * 角色类型常量
+ * Role type constants
  */
 const ROLES = {
   USER: 'user',
@@ -70,12 +69,72 @@ const ROLES = {
   THINKING: 'thinking'
 };
 
-// ES模块导出
+/**
+ * File preview configuration
+ */
+const FILE_PREVIEW = {
+  SUPPORTED_TYPES: {
+    IMAGE: ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'],
+    MARKDOWN: ['md', 'markdown'],
+    HTML: ['html', 'htm'],
+    CODE: ['js', 'ts', 'jsx', 'tsx', 'py', 'java', 'cpp', 'cs', 'go', 'rs'],
+    STYLE: ['css', 'scss', 'less']
+  },
+  ICONS: {
+    FILE: 'fa-file',
+    IMAGE: 'fa-file-image',
+    CODE: 'fa-file-code',
+    PDF: 'fa-file-pdf',
+    CONFIG: 'fa-cog'
+  }
+};
+
+/**
+ * CSS class names
+ */
+const CSS_CLASSES = {
+  MESSAGE: {
+    CONTAINER: 'message',
+    USER: 'user-message',
+    ASSISTANT: 'assistant-message',
+    SYSTEM: 'system-message',
+    THINKING: 'thinking',
+    TOOL_CALL: 'tool-call',
+    TOOL_RESULT: 'tool-result'
+  },
+  TOOL: {
+    HEADER: 'tool-call-header',
+    CONTENT: 'tool-content',
+    RESULT_CONTAINER: 'tool-result-container',
+    SECTION_LABEL: 'tool-section-label',
+    INPUT: 'tool-input',
+    TOGGLE: 'toggle-arrow',
+    COLLAPSED: 'collapsed'
+  },
+  FILE: {
+    RESULT: 'file-result',
+    HEADER: 'file-result-header',
+    PREVIEW: 'file-preview',
+    DOWNLOAD_LINK: 'file-download-link',
+    JSON_DETAILS: 'file-json-details'
+  },
+  PREVIEW: {
+    MARKDOWN: 'markdown-content-preview',
+    HTML: 'html-content-preview',
+    IMAGE: 'image-preview',
+    LOADING: 'preview-loading',
+    CLOSE_BTN: 'close-preview'
+  }
+};
+
+// ES module export
 export {
   API_URL,
   POLLING_INTERVAL,
   DEFAULT_SETTINGS,
   TOOL_DISPLAY,
   MESSAGE_TYPES,
-  ROLES
+  ROLES,
+  FILE_PREVIEW,
+  CSS_CLASSES
 }; 

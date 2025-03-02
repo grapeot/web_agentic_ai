@@ -1,369 +1,300 @@
 /**
- * 事件处理模块 - 管理事件监听和处理
+ * Events Module
+ * Handle DOM event listeners and interactions
  */
+import * as config from './config.js';
 import { state } from './state.js';
-import * as ui from './ui.js';
 import * as api from './api.js';
+import * as ui from './ui.js';
 import * as tools from './tools.js';
+import * as utils from './utils.js';
 
 /**
- * 设置所有事件监听
- * @param {Object} elements - DOM元素引用
+ * Initialize event listeners
  */
-function setupEventListeners(elements) {
-  // 设置滑块事件
-  setupSliderEvents(elements);
+function initializeEventListeners() {
+  // Chat form submission
+  const chatForm = document.getElementById('chat-form');
+  if (chatForm) {
+    chatForm.addEventListener('submit', handleChatSubmit);
+  }
   
-  // 设置按钮事件
-  setupButtonEvents(elements);
-  
-  // 设置其他交互事件
-  setupOtherEvents(elements);
-}
-
-/**
- * 设置滑块和值显示的实时更新
- * @param {Object} elements - DOM元素引用
- * @private
- */
-function setupSliderEvents(elements) {
-  // 温度滑块
-  if (elements.temperatureSlider && elements.tempValue) {
-    elements.temperatureSlider.addEventListener('input', function() {
-      const value = this.value;
-      elements.tempValue.textContent = value;
-      state.updateSetting('temperature', parseFloat(value));
+  // Handle textarea enter key
+  const userInput = document.getElementById('user-input');
+  if (userInput) {
+    userInput.addEventListener('keydown', (event) => {
+      // Submit on Enter (without Shift)
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        const form = document.getElementById('chat-form');
+        if (form) {
+          const submitEvent = new Event('submit', { cancelable: true });
+          form.dispatchEvent(submitEvent);
+        }
+      }
     });
   }
   
-  // 最大令牌数滑块
-  if (elements.maxTokensSlider && elements.tokensValue) {
-    elements.maxTokensSlider.addEventListener('input', function() {
-      const value = this.value;
-      elements.tokensValue.textContent = value;
-      state.updateSetting('maxTokens', parseInt(value, 10));
-    });
+  // Settings form submission
+  const settingsForm = document.getElementById('settings-form');
+  if (settingsForm) {
+    settingsForm.addEventListener('submit', handleSettingsSubmit);
   }
   
-  // 思考预算滑块
-  if (elements.thinkingBudgetSlider && elements.budgetValue) {
-    elements.thinkingBudgetSlider.addEventListener('input', function() {
-      const value = this.value;
-      elements.budgetValue.textContent = value;
-      state.updateSetting('thinkingBudget', parseInt(value, 10));
-    });
-  }
-}
-
-/**
- * Setup button event listeners
- * @param {Object} elements - DOM element references
- * @private
- */
-function setupButtonEvents(elements) {
-  // Send button
-  if (elements.sendButton) {
-    elements.sendButton.addEventListener('click', handleSendMessage);
+  // Settings toggle button
+  const settingsToggle = document.getElementById('settings-toggle');
+  if (settingsToggle) {
+    settingsToggle.addEventListener('click', toggleSettings);
   }
   
-  // Submit tool result button
-  if (elements.submitToolResultButton) {
-    elements.submitToolResultButton.addEventListener('click', handleSubmitToolResult);
-  }
+  // Tool execution buttons
+  document.addEventListener('click', handleToolExecution);
+  
+  // Tool call collapse/expand
+  document.addEventListener('click', handleToolCallToggle);
   
   // Clear chat button
-  if (elements.clearChatButton) {
-    elements.clearChatButton.addEventListener('click', handleClearChat);
+  const clearButton = document.getElementById('clear-chat');
+  if (clearButton) {
+    clearButton.addEventListener('click', handleClearChat);
   }
   
-  // Auto-execute tools toggle
-  if (elements.autoExecuteToolsCheckbox) {
-    elements.autoExecuteToolsCheckbox.addEventListener('change', function() {
-      const autoExecuteEnabled = this.checked;
-      state.updateSetting('autoExecuteTools', autoExecuteEnabled);
-      console.log('Auto-execute tools:', autoExecuteEnabled ? 'enabled' : 'disabled');
-      
-      // If enabling auto-execute and there's a pending tool call, start auto-execution immediately
-      if (autoExecuteEnabled && state.getCurrentToolUseId()) {
-        state.setAutoExecutingTools(true);
-        ui.setAutoExecutionIndicator(true);
-        tools.startPollingForUpdates();
-        
-        // Hide any open tool result modal
-        ui.hideToolResultModal();
-      }
-    });
-  }
+  // Initialize settings form values
+  initializeSettingsForm();
   
-  // Cancel auto-execution button
-  if (elements.cancelAutoExecutionButton) {
-    elements.cancelAutoExecutionButton.addEventListener('click', handleCancelAutoExecution);
-  }
-  
-  // Thinking mode checkbox
-  if (elements.thinkingModeCheckbox) {
-    elements.thinkingModeCheckbox.addEventListener('change', function() {
-      state.updateSetting('thinkingMode', this.checked);
-    });
-  }
+  console.log('Event listeners initialized');
 }
 
 /**
- * 设置其他交互事件
- * @param {Object} elements - DOM元素引用
- * @private
+ * Handle chat form submission
+ * @param {Event} event - Form submit event
  */
-function setupOtherEvents(elements) {
-  // 用户输入回车发送
-  if (elements.userInput) {
-    elements.userInput.addEventListener('keypress', function(e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSendMessage();
-      }
-    });
-  }
+async function handleChatSubmit(event) {
+  event.preventDefault();
   
-  // 聊天消息点击处理（用于交互式元素）
-  if (elements.chatMessages) {
-    elements.chatMessages.addEventListener('click', handleChatMessageClicks);
-  }
-}
-
-/**
- * 处理发送消息按钮点击
- */
-async function handleSendMessage() {
-  const elements = ui.getElements();
+  const messageInput = document.getElementById('user-input');
+  if (!messageInput) return;
   
-  // 检查是否正在等待工具结果
-  if (state.isWaitingForToolResult()) {
-    alert('请先提交当前工具结果');
-    return;
-  }
-  
-  const userInput = elements.userInput;
-  if (!userInput || !userInput.value.trim()) return;
-  
-  const userMessage = userInput.value.trim();
-  userInput.value = '';
-  
-  // 添加用户消息到聊天
-  ui.addMessageToChat('user', userMessage);
-  
-  // 设置加载状态
-  ui.setLoading(true);
+  const message = messageInput.value.trim();
+  if (!message) return;
   
   try {
-    // 准备消息
-    const messages = state.getMessages();
-    messages.push({
-      role: 'user',
-      content: [{
-        type: 'text',
-        text: userMessage
-      }]
-    });
+    // Clear input and disable form
+    messageInput.value = '';
+    messageInput.disabled = true;
+    const submitButton = document.getElementById('send-button');
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
     
-    // 添加到状态
-    state.addMessage(messages[messages.length - 1]);
+    // Add user message to chat
+    ui.addMessageToChat(config.ROLES.USER, message);
     
-    // 发送API请求
+    // Show loading indicator
+    ui.setLoading(true);
+    
+    // Send message to API
     const response = await api.sendMessage(
-      messages,
+      state.getMessages(),
       state.getSettings(),
       state.getConversationId()
     );
     
-    // 设置对话ID
+    // Update conversation ID if needed
     if (response.conversation_id) {
       state.setConversationId(response.conversation_id);
     }
     
-    // 处理助手响应
-    if (response.message) {
-      // 添加到状态
-      state.addMessage(response.message);
-      
-      // 处理消息内容
-      tools.processAssistantMessage(response.message.content);
-      
-      // 检查思考模式
-      if (response.thinking && state.getSettings().thinkingMode) {
-        ui.addThinkingToChat(response.thinking);
-      }
-    }
-    
-    // 检查是否有工具调用
-    if (response.tool_calls && response.tool_calls.length > 0) {
-      // 是否应该自动执行
-      const autoExecute = state.getSettings().autoExecuteTools;
-      
-      if (autoExecute) {
-        // 开始轮询更新
-        tools.startPollingForUpdates();
+    // Process assistant message
+    if (response.messages && response.messages.length > 0) {
+      const lastMessage = response.messages[response.messages.length - 1];
+      if (lastMessage.role === config.ROLES.ASSISTANT && lastMessage.content) {
+        tools.processAssistantMessage(lastMessage.content);
       }
     }
   } catch (error) {
     console.error('Error sending message:', error);
-    ui.addMessageToChat('system', `Error: ${error.message}`);
+    ui.showError('Failed to send message. Please try again.');
   } finally {
+    // Re-enable form
+    messageInput.disabled = false;
+    const submitButton = document.getElementById('send-button');
+    if (submitButton) {
+      submitButton.disabled = false;
+    }
     ui.setLoading(false);
   }
 }
 
 /**
- * 处理清除聊天按钮点击
+ * Handle settings form submission
+ * @param {Event} event - Form submit event
  */
-function handleClearChat() {
-  // 清除UI
-  ui.clearChat();
+function handleSettingsSubmit(event) {
+  event.preventDefault();
   
-  // 清除状态
-  state.reset();
+  const form = event.target;
+  const formData = new FormData(form);
   
-  // 停止任何进行中的轮询
-  const pollingInterval = state.getPollingInterval();
-  if (pollingInterval) {
-    clearInterval(pollingInterval);
-    state.setPollingInterval(null);
+  // Update settings
+  const settings = {
+    temperature: parseFloat(formData.get('temperature')) || config.DEFAULT_SETTINGS.temperature,
+    maxTokens: parseInt(formData.get('maxTokens')) || config.DEFAULT_SETTINGS.maxTokens,
+    autoExecuteTools: formData.get('autoExecuteTools') === 'true',
+    thinkingMode: formData.get('thinkingMode') || config.DEFAULT_SETTINGS.thinkingMode
+  };
+  
+  // Validate settings
+  if (settings.temperature < 0 || settings.temperature > 1) {
+    ui.showError('Temperature must be between 0 and 1');
+    return;
   }
   
-  // 隐藏自动执行指示器
-  ui.setAutoExecutionIndicator(false);
+  if (settings.maxTokens < 1) {
+    ui.showError('Max tokens must be greater than 0');
+    return;
+  }
+  
+  // Save settings
+  state.updateSetting('temperature', settings.temperature);
+  state.updateSetting('maxTokens', settings.maxTokens);
+  state.updateSetting('autoExecuteTools', settings.autoExecuteTools);
+  state.updateSetting('thinkingMode', settings.thinkingMode);
+  
+  // Hide settings panel
+  toggleSettings();
+  
+  console.log('Settings updated:', settings);
 }
 
 /**
- * 处理工具结果提交
+ * Initialize settings form with current values
  */
-async function handleSubmitToolResult() {
-  const elements = ui.getElements();
-  const toolUseId = state.getCurrentToolUseId();
+function initializeSettingsForm() {
+  const settings = state.getSettings();
   
-  if (!toolUseId || !elements.toolResult) {
-    return;
+  // Set form values
+  const temperatureInput = document.querySelector('input[name="temperature"]');
+  if (temperatureInput) {
+    temperatureInput.value = settings.temperature;
   }
   
-  let result = elements.toolResult.value.trim();
-  if (!result) {
-    alert('请提供工具结果');
-    return;
+  const maxTokensInput = document.querySelector('input[name="maxTokens"]');
+  if (maxTokensInput) {
+    maxTokensInput.value = settings.maxTokens;
   }
   
-  // 尝试解析JSON
+  const autoExecuteInput = document.querySelector('input[name="autoExecuteTools"]');
+  if (autoExecuteInput) {
+    autoExecuteInput.checked = settings.autoExecuteTools;
+  }
+  
+  const thinkingModeSelect = document.querySelector('select[name="thinkingMode"]');
+  if (thinkingModeSelect) {
+    thinkingModeSelect.value = settings.thinkingMode;
+  }
+}
+
+/**
+ * Toggle settings panel visibility
+ */
+function toggleSettings() {
+  const settingsPanel = document.getElementById('settings-panel');
+  if (settingsPanel) {
+    settingsPanel.classList.toggle('hidden');
+  }
+}
+
+/**
+ * Handle tool execution button clicks
+ * @param {Event} event - Click event
+ */
+async function handleToolExecution(event) {
+  const button = event.target.closest('.execute-tool-btn');
+  if (!button) return;
+  
+  const toolUseId = button.dataset.toolUseId;
+  if (!toolUseId) return;
+  
   try {
-    JSON.parse(result);
-  } catch (e) {
-    // 如果不是有效的JSON，警告用户
-    if (!confirm('结果不是有效的JSON。确定要继续吗？')) {
-      return;
-    }
-  }
-  
-  // 设置加载状态
-  ui.setLoading(true);
-  
-  try {
-    // 提交工具结果
+    // Disable button
+    button.disabled = true;
+    
+    // Set current tool use ID
+    state.setCurrentToolUseId(toolUseId);
+    
+    // Show loading state
+    ui.setToolExecutionIndicator(toolUseId, true);
+    
+    // Submit tool result
     const response = await api.submitToolResult(
       toolUseId,
-      result,
+      null, // No result for initial execution
       state.getConversationId(),
       state.getSettings().autoExecuteTools
     );
     
-    // 添加工具结果到聊天
-    ui.addToolResultToChat(result, toolUseId);
-    
-    // 重置当前工具ID
-    state.setCurrentToolUseId(null);
-    state.setWaitingForToolResult(false);
-    
-    // 隐藏结果输入框
-    ui.hideToolResultModal();
-    
-    // 处理API响应
-    if (response.message) {
-      // 添加到状态
-      state.addMessage(response.message);
-      
-      // 处理消息内容
-      tools.processAssistantMessage(response.message.content);
+    // Start polling if auto-execute is enabled
+    if (state.getSettings().autoExecuteTools) {
+      tools.startPollingForUpdates();
     }
-  } catch (error) {
-    console.error('Error submitting tool result:', error);
-    ui.addMessageToChat('system', `Error: ${error.message}`);
-  } finally {
-    ui.setLoading(false);
-  }
-}
-
-/**
- * Handle cancel auto-execution button click
- */
-function handleCancelAutoExecution() {
-  console.log('Cancelling auto-execution of tools');
-  
-  // Stop polling interval
-  const pollingInterval = state.getPollingInterval();
-  if (pollingInterval) {
-    clearInterval(pollingInterval);
-    state.setPollingInterval(null);
-  }
-  
-  // Update state
-  state.setAutoExecutingTools(false);
-  
-  // Hide indicator
-  ui.setAutoExecutionIndicator(false);
-  
-  console.log('Auto-execution cancelled');
-}
-
-/**
- * 处理聊天消息区域内的点击
- * @param {Event} e - 点击事件对象
- */
-function handleChatMessageClicks(e) {
-  const target = e.target;
-  
-  // 处理工具调用折叠/展开
-  if (target.closest('.tool-call-header')) {
-    const header = target.closest('.tool-call-header');
-    const content = header.nextElementSibling;
     
-    if (content && content.classList.contains('tool-call-content')) {
-      const isCollapsed = content.style.display === 'none';
-      content.style.display = isCollapsed ? 'block' : 'none';
-      
-      const toggleIcon = header.querySelector('.tool-call-toggle');
-      if (toggleIcon) {
-        toggleIcon.textContent = isCollapsed ? '▼' : '►';
+    // Process response
+    if (response.messages && response.messages.length > 0) {
+      const lastMessage = response.messages[response.messages.length - 1];
+      if (lastMessage.role === config.ROLES.ASSISTANT && lastMessage.content) {
+        tools.processAssistantMessage(lastMessage.content);
       }
     }
+  } catch (error) {
+    console.error('Error executing tool:', error);
+    ui.showError('Failed to execute tool. Please try again.');
+  } finally {
+    // Re-enable button
+    button.disabled = false;
+    ui.setToolExecutionIndicator(toolUseId, false);
+  }
+}
+
+/**
+ * Handle tool call collapse/expand
+ * @param {Event} event - Click event
+ */
+function handleToolCallToggle(event) {
+  const toggle = event.target.closest('.tool-call-toggle');
+  if (!toggle) return;
+  
+  const toolCall = toggle.closest(`.${config.CSS_CLASSES.MESSAGE.TOOL_CALL}`);
+  if (!toolCall) return;
+  
+  // Toggle collapsed state
+  const isCollapsed = toolCall.classList.toggle(config.CSS_CLASSES.MESSAGE.COLLAPSED);
+  
+  // Update toggle button text
+  toggle.textContent = isCollapsed ? config.TOOL_DISPLAY.EXPAND : config.TOOL_DISPLAY.COLLAPSE;
+}
+
+/**
+ * Handle clear chat button click
+ */
+function handleClearChat() {
+  // Clear chat messages
+  const chatMessages = document.getElementById('chat-messages');
+  if (chatMessages) {
+    chatMessages.innerHTML = '';
   }
   
-  // 处理执行工具按钮
-  if (target.closest('.execute-tool-button')) {
-    const button = target.closest('.execute-tool-button');
-    const toolUseId = button.dataset.toolUseId;
-    
-    if (toolUseId) {
-      // 显示工具结果输入框
-      ui.showToolResultModal();
-      
-      // 设置当前工具ID
-      state.setCurrentToolUseId(toolUseId);
-      state.setWaitingForToolResult(true);
-    }
-  }
+  // Reset state
+  state.reset();
+  
+  console.log('Chat cleared');
 }
 
 export {
-  setupEventListeners,
-  handleSendMessage,
-  handleClearChat,
-  handleSubmitToolResult,
-  handleCancelAutoExecution,
-  handleChatMessageClicks
+  initializeEventListeners,
+  handleChatSubmit,
+  handleSettingsSubmit,
+  handleToolExecution,
+  handleToolCallToggle,
+  handleClearChat
 }; 

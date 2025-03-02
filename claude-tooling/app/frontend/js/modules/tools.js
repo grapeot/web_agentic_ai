@@ -1,16 +1,12 @@
 /**
- * Tools Module - Handle tool calls and auto-execution
+ * Tools Module
+ * Handle tool calls and auto-execution
  */
 import * as config from './config.js';
-const POLLING_INTERVAL = config.POLLING_INTERVAL;
-const MESSAGE_TYPES = config.MESSAGE_TYPES;
-const ROLES = config.ROLES;
 import { state } from './state.js';
 import * as ui from './ui.js';
 import * as api from './api.js';
-
-// Track processed message IDs to prevent duplication
-const processedMessageIds = new Set();
+import * as utils from './utils.js';
 
 /**
  * Process assistant message content
@@ -22,23 +18,41 @@ function processAssistantMessage(content) {
     return;
   }
   
+  // Debug output to help diagnose issues
+  console.log('Processing assistant message content:', JSON.stringify(content));
+  
   let textContent = '';
   let toolCalls = [];
   
   // Get displayed tool IDs to avoid duplicate display
   const displayedToolIds = new Set();
-  document.querySelectorAll('.tool-call').forEach(el => {
-    if (el.dataset.toolUseId) {
-      displayedToolIds.add(el.dataset.toolUseId);
+  document.querySelectorAll(`.${config.CSS_CLASSES.MESSAGE.TOOL_CALL}`).forEach(el => {
+    if (el.dataset.toolId) {
+      displayedToolIds.add(el.dataset.toolId);
     }
   });
   
   // Process message content
   content.forEach(item => {
-    if (item.type === MESSAGE_TYPES.TEXT) {
-      // Text message
-      textContent += item.text;
-    } else if (item.type === MESSAGE_TYPES.TOOL_USE && !displayedToolIds.has(item.id)) {
+    if (item.type === config.MESSAGE_TYPES.TEXT) {
+      // For text messages, concatenate content with proper spacing
+      if (textContent && item.text) {
+        // Only add a space if needed to prevent words from running together
+        if (!textContent.endsWith(' ') && !textContent.endsWith('\n') && 
+            !item.text.startsWith(' ') && !item.text.startsWith('\n')) {
+          textContent += ' '; // Add space between concatenated text chunks
+        }
+      }
+      
+      // Ensure item.text is a string
+      if (typeof item.text === 'string') {
+        textContent += item.text;
+      } else if (item.text) {
+        // If item.text is an object, convert to string
+        console.warn('Text item is not a string:', item.text);
+        textContent += JSON.stringify(item.text);
+      }
+    } else if (item.type === config.MESSAGE_TYPES.TOOL_USE && !displayedToolIds.has(item.id)) {
       // Tool call
       toolCalls.push({
         id: item.id,
@@ -61,9 +75,19 @@ function processAssistantMessage(content) {
     }
   });
   
-  // Display text message
+  // Process text content to clean up line breaks before displaying
   if (textContent) {
-    ui.addMessageToChat(ROLES.ASSISTANT, textContent);
+    // Clean up unnecessary consecutive line breaks
+    textContent = utils.cleanLineBreaks(textContent);
+    
+    // Only display if content is new
+    if (!state.hasProcessedContent(textContent)) {
+      // Add the message to the chat
+      ui.addMessageToChat(config.ROLES.ASSISTANT, textContent);
+      
+      // Add to processed content set to prevent duplication
+      state.addProcessedContent(textContent);
+    }
   }
   
   // Display tool calls
@@ -134,7 +158,7 @@ function startPollingForUpdates() {
     } catch (error) {
       console.error('Error polling for updates:', error);
     }
-  }, POLLING_INTERVAL);
+  }, config.POLLING_INTERVAL);
   
   // Save polling interval ID
   state.setPollingInterval(intervalId);
@@ -150,6 +174,9 @@ function startPollingForUpdates() {
 function updateChatWithNewMessages(newMessages) {
   if (!Array.isArray(newMessages) || newMessages.length === 0) return;
   
+  // Debug output
+  console.log('Processing new messages:', JSON.stringify(newMessages));
+  
   // Track pending tool results
   let pendingToolResults = new Map();
   
@@ -158,32 +185,44 @@ function updateChatWithNewMessages(newMessages) {
   let foundLastHandled = !lastHandledToolId; // If no last ID, consider it found
   let hasNewToolCalls = false;
   
-  // Get the current messages from state
-  const currentMessages = state.getMessages();
-  const currentMessageIds = new Set(currentMessages.map(msg => msg.id));
-  
   // Process messages
   for (const message of newMessages) {
     // Skip already processed messages to avoid duplication
-    if (message.id && (processedMessageIds.has(message.id) || currentMessageIds.has(message.id))) {
+    if (message.id && state.hasProcessedMessage(message.id)) {
       continue;
     }
     
     // Mark message as processed
     if (message.id) {
-      processedMessageIds.add(message.id);
+      state.addMessage(message);
     }
     
-    if (message.role === ROLES.ASSISTANT && message.content) {
+    if (message.role === config.ROLES.ASSISTANT && message.content) {
       // Assistant message processing
       const toolCalls = [];
       let textContent = '';
       
       // Process message content
       for (const item of message.content) {
-        if (item.type === MESSAGE_TYPES.TEXT) {
-          textContent += item.text;
-        } else if (item.type === MESSAGE_TYPES.TOOL_USE) {
+        if (item.type === config.MESSAGE_TYPES.TEXT) {
+          // Text message - ensure proper spacing between chunks
+          if (textContent && item.text) {
+            // Only add a space if needed to prevent words from running together
+            if (!textContent.endsWith(' ') && !textContent.endsWith('\n') && 
+                !item.text.startsWith(' ') && !item.text.startsWith('\n')) {
+              textContent += ' '; // Add space between concatenated text chunks
+            }
+          }
+          
+          // Ensure item.text is a string
+          if (typeof item.text === 'string') {
+            textContent += item.text;
+          } else if (item.text) {
+            // If item.text is an object, convert to string
+            console.warn('Text item is not a string:', item.text);
+            textContent += JSON.stringify(item.text);
+          }
+        } else if (item.type === config.MESSAGE_TYPES.TOOL_USE) {
           // Check if it's a new tool call
           if (lastHandledToolId === item.id) {
             foundLastHandled = true;
@@ -208,30 +247,27 @@ function updateChatWithNewMessages(newMessages) {
         }
       }
       
-      // Display text and tool calls
-      if (textContent && foundLastHandled) {
-        ui.addMessageToChat(ROLES.ASSISTANT, textContent);
+      // Clean up unnecessary consecutive line breaks
+      if (textContent) {
+        textContent = utils.cleanLineBreaks(textContent);
+        
+        // Display text and tool calls if not already processed
+        if (foundLastHandled && !state.hasProcessedContent(textContent)) {
+          // Add the message to the chat
+          ui.addMessageToChat(config.ROLES.ASSISTANT, textContent);
+          state.addProcessedContent(textContent);
+        }
       }
       
       for (const toolCall of toolCalls) {
         ui.addToolCallToChat(toolCall);
       }
-      
-      // Add message to state if not already present
-      if (!currentMessageIds.has(message.id)) {
-        state.addMessage(message);
-      }
-    } else if (message.role === ROLES.USER && message.content) {
+    } else if (message.role === config.ROLES.USER && message.content) {
       // User message processing - find tool results
       for (const item of message.content) {
-        if (item.type === MESSAGE_TYPES.TOOL_RESULT && item.tool_use_id) {
+        if (item.type === config.MESSAGE_TYPES.TOOL_RESULT && item.tool_use_id) {
           pendingToolResults.set(item.tool_use_id, item.content);
         }
-      }
-      
-      // Add message to state if not already present
-      if (!currentMessageIds.has(message.id)) {
-        state.addMessage(message);
       }
     }
   }
