@@ -5,6 +5,7 @@ Tool execution services for handling automatic tool calls.
 import json
 import logging
 import asyncio
+import datetime
 from typing import Dict, List, Any, Optional
 import anthropic
 
@@ -104,21 +105,75 @@ async def process_tool_calls_and_continue(
             
         history = conversations[conversation_id]
         
-        # Automatically execute tool calls and get results
-        try:
-            tool_results = await auto_execute_tool_calls(tool_calls, conversation_id)
-        except Exception as e:
-            logger.error(f"Error executing tool calls: {str(e)}")
-            # Add error message to history
-            add_message_to_conversation(
-                conversation_id,
-                {
-                    "role": "system",
-                    "content": [{"type": "text", "text": f"Error executing tool calls: {str(e)}"}]
-                }
-            )
-            set_task_status(conversation_id, "error")
-            return
+        # Update progress status for tool execution
+        from ..services.conversation import update_progress
+        await update_progress(
+            conversation_id,
+            "executing_tool",
+            "tool_execution",
+            f"Executing tool: {tool_calls[0]['name']}..." if tool_calls else "Executing tools...",
+            25
+        )
+        
+        # Process each tool call one by one, updating the conversation history after each one
+        # This way frontend polling will see real-time updates as each tool completes
+        tool_results = []
+        for i, tool_call in enumerate(tool_calls):
+            try:
+                # Add message that we're executing a specific tool
+                tool_start_id = f"tool_start_{tool_call['id']}_{int(datetime.datetime.now().timestamp())}"
+                add_message_to_conversation(
+                    conversation_id,
+                    {
+                        "role": "system",
+                        "content": [{"type": "text", "text": f"Executing tool: {tool_call['name']}..."}],
+                        "id": tool_start_id,
+                        "is_status": True
+                    }
+                )
+                
+                # Execute single tool
+                single_result = await auto_execute_tool_calls([tool_call], conversation_id)
+                tool_results.extend(single_result)
+                
+                # Remove the "executing" message
+                if conversation_id in conversations:
+                    conversations[conversation_id] = [
+                        msg for msg in conversations[conversation_id] 
+                        if not (msg.get("is_status") and msg.get("id") == tool_start_id)
+                    ]
+                    
+                # We don't need to add completion messages for each tool since they cause frontend duplication
+                # The final tool results will be added at the end of this function
+                
+                # Update progress
+                progress_pct = 25 + (25 * (i + 1) / len(tool_calls))
+                await update_progress(
+                    conversation_id,
+                    "executing_tool",
+                    f"tool_{i+1}_of_{len(tool_calls)}",
+                    f"Completed tool {i+1} of {len(tool_calls)}: {tool_call['name']}",
+                    int(progress_pct)
+                )
+                
+            except Exception as e:
+                logger.error(f"Error executing tool call {tool_call['name']}: {str(e)}")
+                # Add error message to history
+                add_message_to_conversation(
+                    conversation_id,
+                    {
+                        "role": "system",
+                        "content": [{"type": "text", "text": f"Error executing tool {tool_call['name']}: {str(e)}"}]
+                    }
+                )
+                await update_progress(
+                    conversation_id,
+                    "error",
+                    "tool_execution_error",
+                    f"Error executing tool {tool_call['name']}: {str(e)}",
+                    0
+                )
+                return
         
         # Check if cancelled
         if auto_execute_tasks.get(conversation_id) == "cancelled":
@@ -128,13 +183,30 @@ async def process_tool_calls_and_continue(
         # Format tool results as expected by Claude API
         tool_result_blocks = format_tool_results_for_claude(tool_results)
         
+        # Clean up temporary status messages before adding tool results
+        if conversation_id in conversations:
+            conversations[conversation_id] = [
+                msg for msg in conversations[conversation_id] 
+                if not msg.get("is_temporary")
+            ]
+            
         # Add tool results to conversation history
         add_message_to_conversation(
             conversation_id,
             {
                 "role": "user",
                 "content": tool_result_blocks
+                # Removed "id" field as it's not accepted by Claude API
             }
+        )
+        
+        # Update progress for Claude API call
+        await update_progress(
+            conversation_id,
+            "waiting_for_claude",
+            "waiting_for_response",
+            "Tool execution complete. Waiting for Claude's response...",
+            50
         )
         
         # Prepare thinking parameter
@@ -152,24 +224,170 @@ async def process_tool_calls_and_continue(
             logger.info(f"Automatic execution of conversation {conversation_id} cancelled")
             return
             
-        # Call Claude API to continue conversation
+        # Call Claude API to continue conversation using asyncio to avoid blocking
         logger.info(f"Continuing conversation with Claude, conversation ID: {conversation_id}")
         try:
-            response = client.messages.create(
-                model="claude-3-7-sonnet-20250219",
-                system="You are running in a headless environment. When generating code that creates visualizations or outputs:\n"\
+            # Add a placeholder message indicating we're waiting for Claude
+            # This allows the frontend to see a message is being processed
+            placeholder_msg_id = f"placeholder_{int(datetime.datetime.now().timestamp())}"
+            add_message_to_conversation(
+                conversation_id,
+                {
+                    "role": "assistant", 
+                    "content": [{"type": "text", "text": "Thinking..."}],
+                    "is_placeholder": True,
+                    "id": placeholder_msg_id
+                }
+            )
+            
+            # Process history to separate system messages from conversation and clean up internal fields
+            system_messages = [msg for msg in history if msg.get("role") == "system"]
+            
+            # Clean up messages before sending to API - remove internal fields not accepted by Claude API
+            api_messages = []
+            for msg in history:
+                if msg.get("role") != "system":
+                    # Create a clean copy without internal fields
+                    clean_msg = {
+                        "role": msg.get("role"),
+                        "content": msg.get("content")
+                    }
+                    api_messages.append(clean_msg)
+            
+            # Ensure tool_use messages are properly followed by tool_result messages
+            # First, find all assistant messages with tool_use blocks
+            tool_use_indices = []
+            for i, msg in enumerate(api_messages):
+                if msg.get("role") == "assistant":
+                    has_tool_use = False
+                    if isinstance(msg.get("content"), list):
+                        for content_item in msg.get("content", []):
+                            if content_item.get("type") == "tool_use":
+                                has_tool_use = True
+                                break
+                    if has_tool_use:
+                        tool_use_indices.append(i)
+            
+            # Check each tool_use message to ensure it's followed by a tool_result
+            if tool_use_indices:
+                fixed_messages = []
+                skip_indices = set()
+                
+                for i, msg in enumerate(api_messages):
+                    # Skip messages we've already processed
+                    if i in skip_indices:
+                        continue
+                    
+                    # If this is a tool_use message
+                    if i in tool_use_indices:
+                        fixed_messages.append(msg)  # Add the assistant message with tool_use
+                        
+                        # Check if it's followed by a user message with tool_result
+                        has_tool_result = False
+                        if i + 1 < len(api_messages) and api_messages[i + 1].get("role") == "user":
+                            user_msg = api_messages[i + 1]
+                            if isinstance(user_msg.get("content"), list):
+                                for content_item in user_msg.get("content", []):
+                                    if content_item.get("type") == "tool_result":
+                                        has_tool_result = True
+                                        fixed_messages.append(user_msg)  # Add the user message with tool_result
+                                        skip_indices.add(i + 1)  # Mark as processed
+                                        break
+                        
+                        # Check for existing tool results in later messages
+                        has_result_elsewhere = False
+                        tool_use_ids = set()
+                        for content_item in msg.get("content", []):
+                            if content_item.get("type") == "tool_use":
+                                tool_use_ids.add(content_item.get("id"))
+                        
+                        # Check all user messages after this one for tool results matching these IDs
+                        for j in range(i+1, len(api_messages)):
+                            if api_messages[j].get("role") == "user":
+                                user_msg = api_messages[j]
+                                if isinstance(user_msg.get("content"), list):
+                                    for content_item in user_msg.get("content", []):
+                                        if (content_item.get("type") == "tool_result" and 
+                                            content_item.get("tool_use_id") in tool_use_ids):
+                                            has_result_elsewhere = True
+                                            break
+                        
+                        # If no tool_result follows, add an empty tool_result response
+                        if not has_tool_result and not has_result_elsewhere:
+                            logger.warning(f"Tool use without corresponding tool result found at index {i}, adding placeholder")
+                            tool_use_blocks = [item for item in msg.get("content", []) 
+                                              if item.get("type") == "tool_use"]
+                            
+                            # Create empty tool results for each tool_use
+                            empty_results = []
+                            for tool_use in tool_use_blocks:
+                                # Only add placeholder for tool uses that don't have results
+                                if not any(api_messages[j].get("role") == "user" and 
+                                          any(item.get("type") == "tool_result" and 
+                                              item.get("tool_use_id") == tool_use.get("id")
+                                              for item in api_messages[j].get("content", []))
+                                          for j in range(i+1, len(api_messages))):
+                                    empty_results.append({
+                                        "type": "tool_result",
+                                        "tool_use_id": tool_use.get("id"),
+                                        "content": json.dumps({"status": "processing", "message": "Processing tool execution..."})
+                                    })
+                            
+                            if empty_results:
+                                fixed_messages.append({
+                                    "role": "user",
+                                    "content": empty_results
+                                })
+                    else:
+                        fixed_messages.append(msg)  # Add regular message
+                
+                # Replace with fixed messages
+                api_messages = fixed_messages
+            
+            # Combine system messages into a single system prompt
+            system_prompt = "You are running in a headless environment. When generating code that creates visualizations or outputs:\n"\
                       "1. DO NOT use interactive elements like plt.show(), figure.show(), or display()\n"\
                       "2. Instead, save outputs to files (e.g., plt.savefig('output.png'))\n"\
                       "3. For Python plots, use matplotlib's savefig() method\n"\
                       "4. For Jupyter-style outputs, write to files instead\n"\
                       "5. Always provide complete, self-contained code that can run without user interaction\n"\
-                      "6. Assume your code runs in a script context, not an interactive notebook",
-                messages=history,
+                      "6. Assume your code runs in a script context, not an interactive notebook"
+            
+            # Add any additional system messages from the conversation
+            for sys_msg in system_messages:
+                if isinstance(sys_msg.get("content"), list):
+                    for content_item in sys_msg.get("content", []):
+                        if content_item.get("type") == "text":
+                            system_prompt += "\n\n" + content_item.get("text", "")
+            
+            # Execute Claude API call in a separate thread to avoid blocking
+            response = await asyncio.to_thread(
+                client.messages.create,
+                model="claude-3-7-sonnet-20250219",
+                system=system_prompt,
+                messages=api_messages,
                 max_tokens=max_tokens,
                 temperature=temperature_param,
                 tools=TOOL_DEFINITIONS,
                 thinking=thinking_param,
             )
+            
+            # Remove placeholder message now that we have the real response
+            if conversation_id in conversations:
+                conversations[conversation_id] = [
+                    msg for msg in conversations[conversation_id] 
+                    if not (msg.get("is_placeholder") and msg.get("id") == placeholder_msg_id)
+                ]
+            
+            # Update progress after receiving Claude's response
+            await update_progress(
+                conversation_id,
+                "processing_response",
+                "processing_claude_response",
+                "Processing Claude's response...",
+                75
+            )
+            
         except Exception as e:
             logger.error(f"Error calling Claude API: {str(e)}")
             # Add error message to history
@@ -180,7 +398,13 @@ async def process_tool_calls_and_continue(
                     "content": [{"type": "text", "text": f"Error calling Claude API: {str(e)}"}]
                 }
             )
-            set_task_status(conversation_id, "error")
+            await update_progress(
+                conversation_id,
+                "error",
+                "api_call_error",
+                f"Error from Claude API: {str(e)}",
+                0
+            )
             return
         
         # Process response
@@ -213,15 +437,50 @@ async def process_tool_calls_and_continue(
                 logger.info(f"Automatic execution of conversation {conversation_id} cancelled")
                 return
                 
-            # Extract new tool calls
+            # Extract new tool calls and filter out duplicates
+            existing_tool_call_ids = set()
+            for msg in conversations.get(conversation_id, []):
+                if msg.get("role") == "assistant" and isinstance(msg.get("content"), list):
+                    for item in msg.get("content", []):
+                        if item.get("type") == "tool_use" and item.get("id"):
+                            existing_tool_call_ids.add(item.get("id"))
+            
             new_tool_calls = []
             for item in content:
                 if item.get('type') == 'tool_use':
+                    # Skip already processed tool calls to prevent duplicates
+                    if item.get('id') in existing_tool_call_ids:
+                        logger.info(f"Skipping already processed tool call: {item.get('id')}")
+                        continue
+                    
                     new_tool_calls.append({
                         "id": item.get('id'),
                         "name": item.get('name'),
                         "input": item.get('input', {})
                     })
+                    
+                    # Add to existing IDs to prevent processing the same tool call multiple times
+                    existing_tool_call_ids.add(item.get('id'))
+            
+            # Update progress based on whether there are new tool calls
+            if not new_tool_calls:
+                # No more tool calls - conversation is complete
+                await update_progress(
+                    conversation_id,
+                    "completed",
+                    "conversation_complete",
+                    "Conversation complete",
+                    100
+                )
+            else:
+                # More tool calls to process
+                await update_progress(
+                    conversation_id,
+                    "preparing_tool_execution",
+                    "new_tool_calls",
+                    f"Preparing to execute {len(new_tool_calls)} new tool{'s' if len(new_tool_calls) > 1 else ''}...",
+                    80
+                )
                     
             # If there are new tool calls and automatic execution is enabled, recursively process
             if auto_execute_tools and new_tool_calls:
@@ -243,7 +502,13 @@ async def process_tool_calls_and_continue(
                     )
                     
                     # Change status to paused
-                    set_task_status(conversation_id, "paused")
+                    await update_progress(
+                        conversation_id,
+                        "paused",
+                        "auto_execution_limit",
+                        "Auto-execution limit reached. Waiting for user to continue...",
+                        90
+                    )
                 else:
                     # Continue with automatic execution
                     logger.info(f"Auto-execution count {current_count} is below limit, continuing processing")
@@ -267,7 +532,13 @@ async def process_tool_calls_and_continue(
                     "content": [{"type": "text", "text": f"Error processing Claude response: {str(e)}"}]
                 }
             )
-            set_task_status(conversation_id, "error")
+            await update_progress(
+                conversation_id,
+                "error",
+                "processing_response_error",
+                f"Error processing Claude response: {str(e)}",
+                0
+            )
             
     except Exception as e:
         logger.error(f"Error processing tool calls and continuing conversation: {str(e)}")
@@ -280,8 +551,23 @@ async def process_tool_calls_and_continue(
                     "content": [{"type": "text", "text": f"Error processing tool calls and continuing conversation: {str(e)}"}]
                 }
             )
-        set_task_status(conversation_id, "error")
+        # Update progress with error information
+        from ..services.conversation import update_progress
+        await update_progress(
+            conversation_id,
+            "error",
+            "execution_error",
+            f"Error: {str(e)}",
+            0
+        )
     finally:
-        # Clean up state after task completion
-        if conversation_id in auto_execute_tasks and auto_execute_tasks[conversation_id] not in ["cancelled", "error"]:
-            set_task_status(conversation_id, "completed") 
+        # Clean up state after task completion if not already marked with a specific status
+        if conversation_id in auto_execute_tasks and auto_execute_tasks[conversation_id] not in ["cancelled", "error", "paused", "completed"]:
+            from ..services.conversation import update_progress
+            await update_progress(
+                conversation_id,
+                "completed",
+                "execution_complete",
+                "Execution complete",
+                100
+            ) 

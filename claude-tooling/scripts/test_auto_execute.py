@@ -29,7 +29,7 @@ if parent_dir not in sys.path:
 load_dotenv()
 
 # Set API endpoint
-API_URL = "http://localhost:8004"  # Updated to correct port
+API_URL = "http://localhost:8004"  # Recommended port
 
 # Global variables for interrupt handling
 current_conversation_id = None
